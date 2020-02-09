@@ -4,7 +4,7 @@ import sys, crypt
 import nacl.pwhash
 
 if (len(sys.argv) != 3):
-    print("usage: %s <username> <password>" % sys.argv[0])
+    print("usage: python3 %s <username> <password>" % sys.argv[0])
     exit(1)
     
 username = sys.argv[1]

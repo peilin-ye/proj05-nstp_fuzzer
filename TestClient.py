@@ -72,9 +72,9 @@ if __name__ == '__main__':
     
     global client_public, client_private
     client_public, client_private= crypto_kx.crypto_kx_keypair()
-
-    messages=list()
-
+    
+    messages = list()
+    ############################################################
     # Test case0: check out-of-spec protocol
     m0= nstp_v3_pb2.NSTPMessage()
     m0.client_hello.major_version=1000
@@ -83,9 +83,15 @@ if __name__ == '__main__':
     m0.client_hello.public_key= client_public
     m0= (m0, False) 
 
-    # Uncomment this line to use this message
-    # messages.append(m0)
-
+    def case0():
+        print("Testing case 0...")
+        ms = list()
+        ms.append(m0) # client_hello (bad nstp version)
+        return ms
+    
+    # uncomment this line to use this message
+    # messages = case0()
+    ############################################################
     # Test case1: check login attemp threshould
     m1= nstp_v3_pb2.NSTPMessage()
     m1.client_hello.major_version=3
@@ -99,32 +105,87 @@ if __name__ == '__main__':
     m2.auth_request.password='wrong password'
     m2= (m2, True)
 
+    # If threshold was 3, this shouldn't work despite sending correct pwd
     m3= nstp_v3_pb2.DecryptedMessage()
     m3.auth_request.username='user'
-    m3.auth_request.password='wrong password'
+    m3.auth_request.password='password' 
     m3= (m3, True)
-
-    m4= nstp_v3_pb2.DecryptedMessage()
-    m4.auth_request.username='user'
-    m4.auth_request.password='wrong password'
-    m4= (m4, True)
-
-    #If threshold was 3, this shouldn't work despite sending correct pwd
-    m5= nstp_v3_pb2.DecryptedMessage()
-    m5.auth_request.username='user'
-    m5.auth_request.password='password' 
-    m5= (m5, True)
     
-    # Uncomment these lines to use these messages
-    # messages.append(m1)
-    # messages.append(m2)
-    # messages.append(m3)
-    # messages.append(m4)
-    # messages.append(m5)
+    def case1():
+        print("Testing case 1...")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m2) # auth_request (bad)
+        ms.append(m2) # auth_request (bad)
+        ms.append(m2) # auth_request (bad)
+        ms.append(m3) # auth_request (good)
+        return ms
+    # uncomment next line to use
+    # messages = case1()
+    ############################################################
+    # Test case2: load non-existing private key
+    m4 = nstp_v3_pb2.DecryptedMessage()
+    m4.load_request.key = "qazxswedcvfrtgbnhyujmkiolp0987654321"
+    m4.load_request.public = False
+    m4 = (m4, True)
 
-    # Test case2: access non-existing private key
-
-    # Test case3: access non-existing public key
+    def case2():
+        print("Testing case 2...")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m3) # auth_request
+        ms.append(m4) # (public) load_request "qazxswedcvfrtgbnhyujmkiolp0987654321"
+        return ms
+    # uncomment next line to use
+    # messages = case2()
+    ############################################################
+    # Test case3: load non-existing public key
+    m5 = nstp_v3_pb2.DecryptedMessage()
+    m5.load_request.key = "qazxswedcvfrtgbnhyujmkiolp0987654321"
+    m5.load_request.public = True
+    m5 = (m5, True)
+    
+    def case3():
+        print("Testing case 3...")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m3) # auth_request
+        ms.append(m5) # (private) load_request "qazxswedcvfrtgbnhyujmkiolp0987654321"    
+        return ms
+    # uncomment next line to use
+    # messages = case3()
+    ############################################################
+    # Test case4: out-of-phase (Initialization)
+    def case4():
+        print("Testing case 4...")
+        ms = list()
+        ms.append(m3) # auth_requset (out-of-phase)
+        return ms
+    # uncomment next line to use
+    # messages = case4()   
+    ############################################################
+    # Test case5: out-of-phase (Authentication)
+    def case5():
+        print("Testing case 5...")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m5) # (private) load_request "qazxswedcvfrtgbnhyujmkiolp0987654321" (out-of-phase)
+        return ms
+    # uncomment next line to use
+    # messages = case5()   
+    ############################################################
+    # Test case6: out-of-phase (Established)
+    def case6():
+        print("Testing case 6...")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m3) # auth_requset
+        ms.append(m1) # client_hello (out-of-phase)
+        return ms    
+    # uncomment next line to use
+    # messages = case6()          
+    ############################################################
+    
     
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.connect(server_address)
