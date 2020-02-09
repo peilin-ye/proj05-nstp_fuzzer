@@ -81,7 +81,15 @@ if __name__ == '__main__':
     messages=list()
 
     # Test case0: check out-of-spec protocol
+    m0= nstp_v3_pb2.NSTPMessage()
+    m0.client_hello.major_version=1000
+    m0.client_hello.minor_version=1
+    m0.client_hello.user_agent='The user'
+    m0.client_hello.public_key= client_public
+    m0= (m0, False) 
 
+    # Uncomment this line to use this message
+    # messages.append(m1)
 
     # Test case1: check login attemp threshould
     m1= nstp_v3_pb2.NSTPMessage()
@@ -89,12 +97,31 @@ if __name__ == '__main__':
     m1.client_hello.minor_version=1
     m1.client_hello.user_agent='The user'
     m1.client_hello.public_key= client_public
-    m1= m1.SerializeToString()
     m1= (m1, False) 
 
-    m2
+    m2= nstp_v3_pb2.DecryptedMessage()
+    m2.auth_request.username='user'
+    m2.auth_request.password='wrong password'
+    m2= (m2, True)
+
+    m3= nstp_v3_pb2.DecryptedMessage()
+    m3.auth_request.username='user'
+    m3.auth_request.password='wrong password'
+    m3= (m3, True)
+
+    m4= nstp_v3_pb2.DecryptedMessage()
+    m4.auth_request.username='user'
+    m4.auth_request.password='wrong password'
+    m4= (m4, True)
+
+    #If threshold was 3, this shouldn't work despite sending correct pwd
+    m5= nstp_v3_pb2.DecryptedMessage()
+    m5.auth_request.username='user'
+    m5.auth_request.password='password' 
+    m5= (m5, True)
     
-    messages.append(m1)
+    # Uncomment this line to use these messages
+    # messages.append(m1, m2, m3, m4, m5)
 
     # Test case2: access non-existing private key
 
