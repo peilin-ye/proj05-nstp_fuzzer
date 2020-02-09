@@ -1,0 +1,145 @@
+// NSTPv3
+
+syntax = "proto3";
+
+message NSTPMessage {
+    oneof message_ {
+        ClientHello client_hello = 1;
+        ServerHello server_hello = 2;
+        ErrorMessage error_message = 3;
+        EncryptedMessage encrypted_message = 4;
+    }
+}
+
+message ClientHello {
+    uint32 major_version = 1;
+    uint32 minor_version = 2;
+    string user_agent = 3;
+    bytes public_key = 4;
+}
+
+message ServerHello {
+    uint32 major_version = 1;
+    uint32 minor_version = 2;
+    string user_agent = 3;
+    bytes public_key = 4;
+}
+
+message ErrorMessage {
+    string error_message = 1;
+}
+
+message AuthenticationRequest {
+    string username = 1;
+    string password = 2;
+}
+
+message AuthenticationResponse {
+    bool authenticated = 1;
+}
+
+message PingRequest {
+    bytes data = 1;
+    HashAlgorithm hash_algorithm = 2;
+}
+
+message PingResponse {
+    bytes hash = 1;
+}
+
+message LoadRequest {
+    string key = 1;
+    bool public = 2;
+}
+
+message LoadResponse {
+    bytes value = 1;
+}
+
+message StoreRequest {
+    string key = 1;
+    bytes value = 2;
+    bool public = 3;
+}
+
+message StoreResponse {
+    bytes hash = 1;
+    HashAlgorithm hash_algorithm = 2;
+}
+
+message EncryptedMessage {
+    bytes ciphertext = 1;
+    bytes nonce = 2;
+}
+
+message DecryptedMessage {
+    oneof message_ {
+        ErrorMessage error_message = 1;
+        PingRequest ping_request = 2;
+        PingResponse ping_response = 3;
+        LoadRequest load_request = 4;
+        LoadResponse load_response = 5;
+        StoreRequest store_request = 6;
+        StoreResponse store_response = 7;
+        AuthenticationRequest auth_request = 8;
+        AuthenticationResponse auth_response = 9;
+    }
+}
+
+enum HashAlgorithm {
+    IDENTITY = 0;
+    SHA256 = 1;
+    SHA512 = 2;
+}
+
+message IDSMessage {
+    oneof message_ {
+        IDSEvent event = 1;
+        IDSDecision decision = 2;
+        IDSTerminateConnection terminate_connection = 3;
+    }
+}
+
+message IDSEvent {
+    uint64 event_id = 1;
+    uint64 timestamp = 2;
+    uint32 address_family = 3;
+    bytes server_address = 4;
+    uint32 server_port = 5;
+    bytes remote_address = 6;
+    uint32 remote_port = 7;
+    oneof event {
+        ConnectionEstablished connection_established = 8;
+        ConnectionTerminated connection_terminated = 9;
+        ClientHello client_hello = 10;
+        ServerHello server_hello = 11;
+        ErrorMessage error_message = 12;
+        PingRequest ping_request = 13;
+        PingResponse ping_response = 14;
+        LoadRequest load_request = 15;
+        LoadResponse load_response = 16;
+        StoreRequest store_request = 17;
+        StoreResponse store_response = 18;
+    }
+    bool client_to_server = 19;
+}
+
+message ConnectionEstablished {
+}
+
+message ConnectionTerminated {
+}
+
+message IDSDecision {
+    uint64 event_id = 1;
+    bool allow = 2;
+}
+
+message IDSTerminateConnection {
+    uint32 address_family = 1;
+    bytes server_address = 2;
+    uint32 server_port = 3;
+    bytes remote_address = 4;
+    uint32 remote_port = 5;
+}
+
