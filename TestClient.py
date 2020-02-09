@@ -5,8 +5,6 @@ import nacl.bindings.crypto_secretbox as secret_box
 import nacl.bindings.randombytes as randombytes
 import nacl.pwhash as pwhash
 
-check_response
-
 
 def send(sock, obj, encrypt=True):
     print("{0}: Sent: {1}".format(self.client_address, obj))
@@ -25,7 +23,12 @@ def send(sock, obj, encrypt=True):
     global client_rx, client_tx
     client_rx, client_tx = crypto_kx.crypto_kx_client_session_keys
 
-def process_response(message): # message= message received
+def process_response(sock): # message= message received
+
+    header = sock.recv(2)
+    message_length, = struct.unpack('>H', header) 
+    message= self.request.recv(message_length)
+
     nstp_message= nstp_v3_pb2.NSTPMessage()
     nstp_message.ParseFromString(message)
 
@@ -43,11 +46,10 @@ def process_response(message): # message= message received
         print("Got unkwown NSTP message")
 
 def process_server_hello(nstp_message): # we only want the server_hello to grab the session keys
+    server_hello= nstp_message.server_hello
+    
     global client_public, client_private
     global client_rx, client_tx
-
-    server_hello= nstp_message.server_hello
-
     client_rx, client_tx = crypto_kx.crypto_kx_client_session_keys(client_public, client_private, server_hello.public_key)
 
 def process_encrypted_message(nstp_message):
@@ -78,7 +80,21 @@ if __name__ == '__main__':
 
     messages=list()
 
+    # Test case0: check out-of-spec protocol
+
+
     # Test case1: check login attemp threshould
+    m1= nstp_v3_pb2.NSTPMessage()
+    m1.client_hello.major_version=3
+    m1.client_hello.minor_version=1
+    m1.client_hello.user_agent='The user'
+    m1.client_hello.public_key= client_public
+    m1= m1.SerializeToString()
+    m1= (m1, False) 
+
+    m2
+    
+    messages.append(m1)
 
     # Test case2: access non-existing private key
 
@@ -88,7 +104,5 @@ if __name__ == '__main__':
         sock.connect(server_address)
 
         for m in messages:    
-            send(sock, m])
-            response = sock.recv(6500)
-            print("Received: {}".format(response))
-            check_response(response, m)
+            send(sock, m[0], m[1])           
+            check_response(sock)
