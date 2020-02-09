@@ -83,8 +83,16 @@ if __name__ == '__main__':
     m0.client_hello.public_key= client_public
     m0= (m0, False) 
 
+    m1= nstp_v3_pb2.NSTPMessage()
+    m1.client_hello.major_version=3
+    m1.client_hello.minor_version=1
+    m1.client_hello.user_agent='The user'
+    m1.client_hello.public_key= client_public
+    m1= (m1, False) 
+
     # Uncomment this line to use this message
     # messages.append(m0)
+    # messages.append(m1)
 
     # Test case1: check login attemp threshould
     m1= nstp_v3_pb2.NSTPMessage()
