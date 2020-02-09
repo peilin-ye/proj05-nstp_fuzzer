@@ -1,8 +1,8 @@
 import struct, time, threading, hashlib, sys, socket
 import nstp_v3_pb2, nacl.utils
 import nacl.bindings.crypto_kx as crypto_kx
-import nacl.bindings.crypto_secretbox as secret_box
-import nacl.bindings.randombytes as randombytes
+from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretbox, crypto_secretbox_NONCEBYTES 
+from nacl.bindings.randombytes import randombytes
 import nacl.pwhash as pwhash
 
 
@@ -12,12 +12,12 @@ def send(sock, obj, encrypt=True):
 
     if encrypt:
         global client_tx
-        nonce= randombytes.randombytes(secret_box.crypto_secretbox_NONCEBYTES)
-        encrypted_bytes= secret_box.crypto_secretbox(bytes_to_send, nonce, client_tx)
-        encrypted_message= nstp_v3_pb2.EncryptedMessage()
-        encrypted_message.ciphertext= encrypted_bytes
-        encrypted_message.nonce= nonce
-        bytes_to_send= encrypted_message.SerializeToString()
+        nonce= randombytes(crypto_secretbox_NONCEBYTES)
+        encrypted_bytes= crypto_secretbox(bytes_to_send, nonce, client_tx)
+        nstp_message= nstp_v3_pb2.NSTPMessage()
+        nstp_message.encrypted_message.ciphertext= encrypted_bytes
+        nstp_message.encrypted_message.nonce= nonce
+        bytes_to_send= nstp_message.SerializeToString()
 
     sock.sendall(len(bytes_to_send).to_bytes(2, byteorder="big") + bytes_to_send)
 
@@ -54,7 +54,7 @@ def process_encrypted_message(nstp_message):
     encrypted_message=nstp_message.encrypted_message
 
     try:
-        decrypted_bytes= secret_box.crypto_secretbox_open(encrypted_message.ciphertext, encrypted_message.nonce, client_rx)
+        decrypted_bytes= crypto_secretbox_open(encrypted_message.ciphertext, encrypted_message.nonce, client_rx)
     except Exception as e:
         print("Error decrypting message")
         return
@@ -115,8 +115,12 @@ if __name__ == '__main__':
     m5.auth_request.password='password' 
     m5= (m5, True)
     
-    # Uncomment this line to use these messages
-    # messages.append(m1, m2, m3, m4, m5)
+    # Uncomment these lines to use these messages
+    # messages.append(m1)
+    # messages.append(m2)
+    # messages.append(m3)
+    # messages.append(m4)
+    # messages.append(m5)
 
     # Test case2: access non-existing private key
 
