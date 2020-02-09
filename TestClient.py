@@ -1,4 +1,4 @@
-import struct, time, threading, hashlib, sys
+import struct, time, threading, hashlib, sys, socket
 import nstp_v3_pb2, nacl.utils
 import nacl.bindings.crypto_kx as crypto_kx
 import nacl.bindings.crypto_secretbox as secret_box
@@ -7,12 +7,13 @@ import nacl.pwhash as pwhash
 
 
 def send(sock, obj, encrypt=True):
-    print("{0}: Sent: {1}".format(self.client_address, obj))
+    print("Sent: {0}".format(obj))
     bytes_to_send= obj.SerializeToString()
 
     if encrypt:
+        global client_tx
         nonce= randombytes.randombytes(secret_box.crypto_secretbox_NONCEBYTES)
-        encrypted_bytes= secret_box.crypto_secretbox(bytes_to_send, nonce, self.server_tx)
+        encrypted_bytes= secret_box.crypto_secretbox(bytes_to_send, nonce, client_tx)
         encrypted_message= nstp_v3_pb2.EncryptedMessage()
         encrypted_message.ciphertext= encrypted_bytes
         encrypted_message.nonce= nonce
@@ -20,19 +21,14 @@ def send(sock, obj, encrypt=True):
 
     sock.sendall(len(bytes_to_send).to_bytes(2, byteorder="big") + bytes_to_send)
 
-    global client_rx, client_tx
-    client_rx, client_tx = crypto_kx.crypto_kx_client_session_keys
-
 def process_response(sock): # message= message received
 
     header = sock.recv(2)
     message_length, = struct.unpack('>H', header) 
-    message= self.request.recv(message_length)
+    message= sock.recv(message_length)
 
     nstp_message= nstp_v3_pb2.NSTPMessage()
     nstp_message.ParseFromString(message)
-
-    print("Received: {0}".format( nstp_message))
 
     message_type = nstp_message.WhichOneof('message_')
     if message_type == 'server_hello':
@@ -53,11 +49,12 @@ def process_server_hello(nstp_message): # we only want the server_hello to grab 
     client_rx, client_tx = crypto_kx.crypto_kx_client_session_keys(client_public, client_private, server_hello.public_key)
 
 def process_encrypted_message(nstp_message):
+    global client_rx
 
     encrypted_message=nstp_message.encrypted_message
 
     try:
-        decrypted_bytes= secret_box.crypto_secretbox_open(encrypted_message.ciphertext, encrypted_message.nonce, self.server_rx)
+        decrypted_bytes= secret_box.crypto_secretbox_open(encrypted_message.ciphertext, encrypted_message.nonce, client_rx)
     except Exception as e:
         print("Error decrypting message")
         return
@@ -75,8 +72,6 @@ if __name__ == '__main__':
     
     global client_public, client_private
     client_public, client_private= crypto_kx.crypto_kx_keypair()
-    
-    crypto_kx_server_session_keys(server_public, server_private, self.public_key)
 
     messages=list()
 
@@ -89,7 +84,7 @@ if __name__ == '__main__':
     m0= (m0, False) 
 
     # Uncomment this line to use this message
-    # messages.append(m1)
+    # messages.append(m0)
 
     # Test case1: check login attemp threshould
     m1= nstp_v3_pb2.NSTPMessage()
@@ -132,4 +127,4 @@ if __name__ == '__main__':
 
         for m in messages:    
             send(sock, m[0], m[1])           
-            check_response(sock)
+            process_response(sock)
