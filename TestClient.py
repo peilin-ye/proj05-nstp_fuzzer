@@ -5,6 +5,9 @@ from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretb
 from nacl.bindings.randombytes import randombytes
 import nacl.pwhash as pwhash
 
+if len(sys.argv) != 2:
+    print("usage: python3 %s <test case index>" % sys.argv[0])
+    exit(1)
 
 def send(sock, obj, encrypt=True):
     print("Sent: {0}".format(obj))
@@ -66,15 +69,15 @@ def process_encrypted_message(nstp_message):
 
     print(decrypted_message)
 
-
 if __name__ == '__main__':
     server_address = ('localhost', 22300)
     
     global client_public, client_private
     client_public, client_private= crypto_kx.crypto_kx_keypair()
-
-    messages=list()
-
+    
+    messages = list()
+    cases = list()
+    ############################################################
     # Test case0: check out-of-spec protocol
     m0= nstp_v3_pb2.NSTPMessage()
     m0.client_hello.major_version=1000
@@ -95,6 +98,15 @@ if __name__ == '__main__':
     # messages.append(m1)
 
     # Test case1: check login attemp threshould
+    def case0():
+        print("Testing case 0...")
+        ms = list()
+        ms.append(m0) # client_hello (bad nstp version)
+        ms.append(m1)
+        return ms
+    cases.append(case0)
+    ############################################################
+    # Test case1: check login attemp threshold
     m1= nstp_v3_pb2.NSTPMessage()
     m1.client_hello.major_version=3
     m1.client_hello.minor_version=1
@@ -107,32 +119,104 @@ if __name__ == '__main__':
     m2.auth_request.password='wrong password'
     m2= (m2, True)
 
+    # If threshold was 3, this shouldn't work despite sending correct pwd
     m3= nstp_v3_pb2.DecryptedMessage()
     m3.auth_request.username='user'
-    m3.auth_request.password='wrong password'
+    m3.auth_request.password='password' 
     m3= (m3, True)
-
-    m4= nstp_v3_pb2.DecryptedMessage()
-    m4.auth_request.username='user'
-    m4.auth_request.password='wrong password'
-    m4= (m4, True)
-
-    #If threshold was 3, this shouldn't work despite sending correct pwd
-    m5= nstp_v3_pb2.DecryptedMessage()
-    m5.auth_request.username='user'
-    m5.auth_request.password='password' 
-    m5= (m5, True)
     
-    # Uncomment these lines to use these messages
-    # messages.append(m1)
-    # messages.append(m2)
-    # messages.append(m3)
-    # messages.append(m4)
-    # messages.append(m5)
+    def case1():
+        print("Test case1: check login attemp threshold")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m2) # auth_request (bad)
+        ms.append(m2) # auth_request (bad)
+        ms.append(m2) # auth_request (bad)
+        ms.append(m3) # auth_request (good)
+        return ms
+    cases.append(case1)
+    ############################################################
+    # Test case2: load non-existing private key
+    m4 = nstp_v3_pb2.DecryptedMessage()
+    m4.load_request.key = "qazxswedcvfrtgbnhyujmkiolp0987654321"
+    m4.load_request.public = False
+    m4 = (m4, True)
 
-    # Test case2: access non-existing private key
+    def case2():
+        print("Test case2: load non-existing private key")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m3) # auth_request
+        ms.append(m4) # (public) load_request "qazxswedcvfrtgbnhyujmkiolp0987654321"
+        return ms
+    cases.append(case2)
+    ############################################################
+    # Test case3: load non-existing public key
+    m5 = nstp_v3_pb2.DecryptedMessage()
+    m5.load_request.key = "qazxswedcvfrtgbnhyujmkiolp0987654321"
+    m5.load_request.public = True
+    m5 = (m5, True)
+    
+    def case3():
+        print("Test case3: load non-existing public key")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m3) # auth_request
+        ms.append(m5) # (private) load_request "qazxswedcvfrtgbnhyujmkiolp0987654321"    
+        return ms
+    cases.append(case3)
+    ############################################################
+    # Test case4: out-of-phase (Initialization)
+    m6 = nstp_v3_pb2.NSTPMessage()
+    m6.server_hello.major_version = 3
+    m6.server_hello.minor_version = 10086
+    m6.server_hello.user_agent = "This is out-of-spec muahahah"
+    m6.server_hello.public_key = b"What key?"
+    m6 = (m6, False)
+    
+    def case4():
+        print("Test case4: out-of-phase (Initialization)")
+        ms = list()
+        ms.append(m6) # auth_requset (out-of-phase)
+        return ms
+    cases.append(case4) 
+    ############################################################
+    # Test case5: out-of-phase (Authentication)
+    def case5():
+        print("Test case5: out-of-phase (Authentication)")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m5) # (private) load_request "qazxswedcvfrtgbnhyujmkiolp0987654321" (out-of-phase)
+        return ms
+    cases.append(case5) 
+    ############################################################
+    # Test case6: out-of-phase (Established)
+    def case6():
+        print("Test case6: out-of-phase (Established)")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m3) # auth_requset
+        ms.append(m1) # client_hello (in clear, out-of-phase)
+        return ms    
+    cases.append(case6)        
+    ############################################################
+    # Test case7: invalid hash algorithm identifier in PingRequest
+    m7 = nstp_v3_pb2.DecryptedMessage()
+    m7.ping_request.data = b"qazxswedcvfrtgbnhyujmkiolp0987654321"
+    m7.ping_request.hash_algorithm = 42
+    m7 = (m7, True)
+    
+    def case7():
+        print("Test case7: invalid hash algorithm identifier in PingRequest")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m3) # auth_request
+        ms.append(m7) # ping_request with invalid hash_algorithm
+        return ms
+    cases.append(case7)        
+    ############################################################   
 
-    # Test case3: access non-existing public key
+    messages = cases[int(sys.argv[1])]()    
     
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.connect(server_address)
