@@ -215,7 +215,7 @@ if __name__ == '__main__':
         return ms
     cases.append(case7)        
     ############################################################   
-    # Test case8: Concurrent clients trying to retrieve other's keys. RUN THIS CASE before #2 and #3
+    # Test case8: Concurrent clients trying to retrieve other's keys. RUN THIS CASE before #9 and #10
     m8= nstp_v3_pb2.DecryptedMessage()
     m8.store_request.key='qazxswedcvfrtgbnhyujmkiolp0987654321'
     m8.store_request.value= b"private value. shouldn't be accesed by a third party"
@@ -240,6 +240,36 @@ if __name__ == '__main__':
         return ms
     cases.append(case8)
     ############################################################   
+    # Test case9: malicious user trying to access other's PUBLIC data
+    m10 = nstp_v3_pb2.DecryptedMessage()
+    m10.auth_request.username='evil'
+    m10.auth_request.password='password' 
+    m10 = (m10, True)
+
+    def case9():
+        print("Test case9: malicious user trying to access other's PUBLIC data")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m10) # auth_request, user: evil
+        ms.append(m4) # (public) load_request "qazxswedcvfrtgbnhyujmkiolp0987654321"
+        return ms
+    cases.append(case9)
+    ############################################################
+    # Test case10: malicious user trying to access other's PRIVATE data
+    m3= nstp_v3_pb2.DecryptedMessage()
+    m3.auth_request.username='user'
+    m3.auth_request.password='password' 
+    m3= (m3, True)
+    
+    def case10():
+        print("Test case10: malicious user trying to access other's PRIVATE data")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m10) # auth_request, user: evil
+        ms.append(m5) # (private) load_request "qazxswedcvfrtgbnhyujmkiolp0987654321"    
+        return ms
+    cases.append(case10)
+    ############################################################
 
 
     messages = cases[int(sys.argv[1])]()    
