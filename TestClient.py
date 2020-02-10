@@ -215,6 +215,32 @@ if __name__ == '__main__':
         return ms
     cases.append(case7)        
     ############################################################   
+    # Test case8: Concurrent clients trying to retrieve other's keys. RUN THIS CASE before #2 and #3
+    m8= nstp_v3_pb2.DecryptedMessage()
+    m8.store_request.key='qazxswedcvfrtgbnhyujmkiolp0987654321'
+    m8.store_request.value= b"private value. shouldn't be accesed by a third party"
+    m8.store_request.public=False
+    m8 = (m8, True)
+
+    m9= nstp_v3_pb2.DecryptedMessage()
+    m9.store_request.key='qazxswedcvfrtgbnhyujmkiolp0987654321'
+    m9.store_request.value= b"public value. if you see this, then it's working good"
+    m9.store_request.public=True
+    m9 = (m9, True)
+    
+    def case8():
+        print("Test case8: Concurrent clients trying to retrieve other's keys. RUN THIS CASE before #2 and #3")
+        ms = list()
+        ms.append(m1) # client_hello
+        ms.append(m3) # auth_request
+        ms.append(m8) # private store_request
+        ms.append(m9) # public store_request
+        ms.append(m4) # private load_request
+        
+        return ms
+    cases.append(case8)
+    ############################################################   
+
 
     messages = cases[int(sys.argv[1])]()    
     
