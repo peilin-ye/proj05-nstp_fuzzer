@@ -5,9 +5,10 @@ from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretb
 from nacl.bindings.randombytes import randombytes
 import nacl.pwhash as pwhash
 
-if len(sys.argv) != 2:
-    print("usage: python3 %s <test case index>" % sys.argv[0])
-    exit(1)
+if not (((len(sys.argv)==2) and (sys.argv[1] in range(11))) or ((len(sys.argv)==3) and (sys.argv[1]=="11"))):
+    print("usage:\ncase 0~10: python3 %s <case index>" % sys.argv[0])
+    print("case 11: python3 %s <case index> <# of attempts>" % sys.argv[0])
+    exit(1)    
 
 def send(sock, obj, encrypt=True):
     print("Sent: {0}".format(obj))
@@ -270,9 +271,23 @@ if __name__ == '__main__':
         return ms
     cases.append(case10)
     ############################################################
+    # Test case11: too many failed auth attempts
+    # note: receives sys.argv[2] as parameter
 
-
-    messages = cases[int(sys.argv[1])]()    
+    def case11(attempts):
+        print("Test case11: too many failed auth attempts")
+        ms = list()
+        ms.append(m1) # client_hello
+        for _ in range(int(attempts)):
+            ms.append(m2) # auth_request (bad)
+        return ms
+    cases.append(case11)
+    ############################################################
+    
+    if sys.argv[1] == "11":
+        messages = cases[11](sys.argv[2])
+    else:
+        messages = cases[int(sys.argv[1])]()    
     
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.connect(server_address)
