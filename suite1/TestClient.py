@@ -5,6 +5,7 @@ from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretb
 from nacl.bindings.randombytes import randombytes
 import nacl.pwhash as pwhash
 
+# Or maybe I should use argparse, Ugh...
 if not (((len(sys.argv)==2) and (sys.argv[1] in range(11))) or ((len(sys.argv)==3) and (sys.argv[1]=="11"))):
     print("usage:\ncase 0~10: python3 %s <case index>" % sys.argv[0])
     print("case 11: python3 %s <case index> <# of attempts>" % sys.argv[0])
@@ -284,6 +285,7 @@ if __name__ == '__main__':
     cases.append(case11)
     ############################################################
     
+    # Case 11 receives 2 args, others receive 1  
     if sys.argv[1] == "11":
         messages = cases[11](sys.argv[2])
     else:
