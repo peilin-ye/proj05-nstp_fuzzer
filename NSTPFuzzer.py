@@ -75,7 +75,8 @@ def fuzz_auth_request(options):
 
         auth_request_response=serialize_send_and_receive(auth_request)
 
-        # TODO check AuthResponse/Error
+        # TODO decrypt and check AuthResponse/Error
+        global client_rx
 
 def fuzz_ping_request(options):
     if options.data:
@@ -100,14 +101,15 @@ def fuzz_ping_request(options):
     generate_session_keys(options.public_key)
     auth_request=craft_auth_request(options.username, options.password)
 
-    # TODO verify auth request
+    # TODO decrypt and check AuthResponse/Error
+    global client_rx
 
     for i in range(0,1000):
         ping_request=craft_ping_request(options.data, options.algo)
 
         ping_request_response=serialize_send_and_receive(ping_request)
 
-        # TODO check PingResponse/Error
+        # TODO decrypt and check PingResponse/Error
 
 def fuzz_load_request(options):
     # TODO. See PingRequest 
