@@ -8,17 +8,6 @@ def random():
     return 42
 
 def craft_client_hello(major=None, minor=None, user_agent=None, public_key=None):
-    """
-    Returns an NSTPMessage containing a ClientHello.
-    If not specified in parameters, field values are randomly generated.
-    
-    :param major: int
-    :param minor: int
-    :param user_agent: string
-    :param public_key: bytes
-    :rtype: NSTPMessage
-    """
-   
     client_hello = nstp_v3_pb2.ClientHello()
     
     # TODO replace random() functions with real rand(), according to field type
