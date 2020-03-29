@@ -192,6 +192,7 @@ if __name__ == '__main__':
     # How many rounds do you want to fuzz?
     parser.add_argument("--rounds",
                         help = "How many rounds do you want to fuzz?",
+                        type = int,
                         default = 10)
 
     # Options for the ClientHello.
