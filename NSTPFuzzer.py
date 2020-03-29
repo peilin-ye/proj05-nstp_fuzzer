@@ -17,8 +17,8 @@ def serialize_send_and_receive(unserialized_proto_message, encrypt=True):
 
         if encrypt:
             global client_tx
-            if client_tx=None:
-                print("Client TX  key not generated. CLosing.")
+            if client_tx==None:
+                print("Client TX key not generated. Closing.")
                 exit(1)
 
             nonce= randombytes(crypto_secretbox_NONCEBYTES)
@@ -48,9 +48,9 @@ def fuzz_client_hello(options):
     if options.user_agent:
         print("[ClientHello] user_agent={options.user_agent}")
     if options.public_key:
-        print("[ClientHello] public_key={options.public_key}"
+        print("[ClientHello] public_key={options.public_key}")
 
-    for i in range(0,1000):
+    for i in range(0, 1000):
         client_hello=craft_client_hello(options.major, options.minor, options.user_agent, options.public_key)
 
         clien_hello_response= serialize_send_and_receive(client_hello, encrypt=False)    
@@ -158,7 +158,7 @@ if __name__ == '__main__':
                         help='[ClientHello] Fixed minor value to use. Otherwise, will be fuzzed.',
                         type=int,
                         default=None)      
-    parser.add_argument("--agent", 
+    parser.add_argument("--user_agent", 
                         help='[ClientHello] Fixed user agent to use. Otherwise, will be fuzzed.',
                         default=None)               
 
