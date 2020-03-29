@@ -19,56 +19,36 @@ def craft_client_hello(major=None, minor=None, user_agent=None, public_key=None)
     return client_hello
 
 def craft_auth_request(username=None, password=None):
+    auth_request = nstp_v3_pb2.AuthenticationRequest()
 
     # TODO replace random() functions with real rand(), according to field type
-    if username is None:
-        username=random()
+    auth_request.username = str(random()) if (username is None) else username
+    auth_request.password = str(random()) if (password is None) else password
 
-    if password is None:
-        password=random()
-
-    # TODO Now that we have all the values, Serialize to protobuf!
-    proto_auth_request= nstp_v3_pb2.AuthenticationRequest()
-
-    return proto_auth_request
+    return auth_request
 
 def craft_ping_request(data=None, algorithm=None):
+    ping_request = nstp_v3_pb2.PingRequest()
+    
     # TODO replace random() functions with real rand(), according to field type
-    
-    if data is None:
-        data=random()
-    else:
-        # literal_eval takes the string "b'\x01....'" as bytes
-        data= ast.literal_eval(data)
+    ping_request.data = str(random()).encode() if (data is None) else ast.literal_eval(data)
+    ping_request.hash_algorithm = random() if (algorithm is None) else algorithm
 
-    if algorithm is None:
-        algorithm=random()
-    
-
-    # TODO Now that we have all the values, Serialize to protobuf!
-    proto_ping_request= nstp_v3_pb2.PingRequest()
-
-    return proto_ping_request
+    return ping_request
 
 def craft_store_request(key=None, value=None, is_public=None):
+    store_request = nstp_v3_pb2.StoreRequest()
+    
     # TODO replace random() functions with real rand(), according to field type
-    if key is None:
-        key=random()
+    store_request.key = str(random()) if (key is None) else key
+    store_request.value = str(random()).encode() if (value is None) else ast.literal_eval(value)
+    store_request.is_public = bool(random()) if (is_public is None) else is_public
 
-    if value is None:
-        value=random()
-    else:
-        # literal_eval takes the string "b'\x01....'" as bytes
-        value=ast.literal_eval(value)
-
-    if is_public is None:
-        is_public=random()
-
-    # TODO Now that we have all the values, Serialize to protobuf!
-    proto_store_request= nstp_v3_pb2.StoreRequest()
-
-    return proto_store_request
+    return store_request
 
 def craft_load_request(key=None, is_public=None):
-    pass
-    # TODO
+    load_request = nstp_v3_pb2.LoadRequest()
+
+    # TODO replace random() functions with real rand(), according to field type
+    load_request.key = str(random()) if (key is None) else key
+    load_request.is_public = bool(random()) if (is_public is None) else is_public

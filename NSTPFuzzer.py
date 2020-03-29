@@ -1,4 +1,4 @@
-import argparse, socket, struct
+import argparse, socket, struct, logging
 import utils.ProtoCrafter
 import nacl.utils
 import utils.nstp_v3_pb2 as nstp_v3_pb2
@@ -7,8 +7,6 @@ import nacl.bindings.crypto_kx as crypto_kx
 from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretbox, crypto_secretbox_NONCEBYTES 
 from nacl.bindings.randombytes import randombytes
 
-MAXFUZZ = 5
-
 CLIENT_HELLO      = 1   # client_hello = 1;
 SERVER_HELLO      = 2   # server_hello = 2;
 ERROR_MESSAGE     = 3   # error_message = 3;
@@ -16,6 +14,37 @@ ENCRYPTED_MESSAGE = 4   # encrypted_message = 4;
 
 def pack(x):
     return (len(x).to_bytes(2, byteorder="big") + x)
+
+def receive_nstp(sock):
+    # 1) Read the prefix
+    prefix = b""
+    while len(prefix) < 2:
+        chunk = sock.recv(2)
+        if not chunk:
+            break
+        prefix += chunk
+    if not prefix:
+        logging.error("receive_ntsp(): failed to read NSTPMessage length prefix!")
+        return 0
+    length = int.from_bytes(prefix, "big")
+    
+    # 2) Read the payload
+    payload = b""
+    while len(payload) < length:
+        chunk = sock.recv(length)
+        if not chunk:
+            break
+        payload += chunk
+    if not payload:
+        logging.error("receive_ntsp(): failed to read NSTPMessage!")
+        return 0
+    
+    # 3) Parse it
+    nstp = nstp_v3_pb2.NSTPMessage()
+    nstp.ParseFromString(payload)
+    msg_type = nstp.WhichOneof("message_")
+    logging.debug("receive_ntsp(): received {0} from the server, length: {1}".format(msg_type, length))
+    return nstp
 
 def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
     nstp = nstp_v3_pb2.NSTPMessage()
@@ -29,7 +58,7 @@ def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
     elif msg_type == ENCRYPTED_MESSAGE:
         global client_tx
         if client_tx == None:
-            print("Client TX key not generated. Closing.")
+            logging.error("serialize_send_and_receive(): Client TX key not generated!")
             exit(1)
         nonce = randombytes(crypto_secretbox_NONCEBYTES)
         encrypted_bytes = crypto_secretbox(bytes_to_send, nonce, client_tx)
@@ -37,33 +66,29 @@ def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
         nstp.encrypted_message.nonce = nonce
         bytes_to_send = nstp.SerializeToString()
     else:
-        print("serialize_send_and_receive(): Invalid msg_type!")
+        logging.error("serialize_send_and_receive(): Invalid msg_type!")
         exit(1)
 
-    sock.sendall(pack(nstp.SerializeToString()))
-
-    header = sock.recv(2)
-    message_length, = struct.unpack('>H', header) 
-    message= sock.recv(message_length)
-
-    nstp = nstp_v3_pb2.NSTPMessage()
-    nstp.ParseFromString(message)
+    bytes_to_send = nstp.SerializeToString()
+    logging.debug("serialize_send_and_receive(): sending {0} to the server, length: {1}".format(nstp.WhichOneof("message_"), len(bytes_to_send)))
+    sock.sendall(pack(bytes_to_send))
+    
     # Here we shouldn't decrypt the message because we still don't know which type is it. We have to do it in each fuzz_...() function
-    return nstp
+    return receive_nstp(sock)
 
 def fuzz_client_hello(options):
     if options.major:
-        print("[ClientHello] major={options.major}")
+        logging.info("[ClientHello] major={options.major}")
     if options.minor:
-        print("[ClientHello] minor={options.minor}")
+        logging.info("[ClientHello] minor={options.minor}")
     if options.user_agent:
-        print("[ClientHello] user_agent={options.user_agent}")
+        logging.info("[ClientHello] user_agent={options.user_agent}")
     if options.public_key:
-        print("[ClientHello] public_key={options.public_key}")
+        logging.info("[ClientHello] public_key={options.public_key}")
 
     global server_address
 
-    for i in range(0, MAXFUZZ):
+    for i in range(0, options.rounds):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(server_address)
             
@@ -74,18 +99,18 @@ def fuzz_client_hello(options):
 
 def fuzz_auth_request(options):
     if options.username:
-        print("[AuthRequest] username={options.username}")
+        logging.info("[AuthRequest] username={options.username}")
     if options.password:
-        print("[AuthRequest] password={options.password}")    
+        logging.info("[AuthRequest] password={options.password}")    
     
     if options.public_key is None:
-        print("[AuthRequest] You must provide a public_key! Closing...")   
+        logging.info("[AuthRequest] You must provide a public_key! Closing...")   
         exit(1)
 
     # TODO may be, this have to be in a loop? I mean, to send a client hello per AuthRequest? We'd have to adjust it as we test the servers
     generate_session_keys(options.public_key)
 
-    for i in range(0, MAXFUZZ):
+    for i in range(0, options.rounds):
         auth_request=craft_auth_request(options.username, options.password)
 
         auth_request_response=serialize_send_and_receive(auth_request)
@@ -95,21 +120,21 @@ def fuzz_auth_request(options):
 
 def fuzz_ping_request(options):
     if options.data:
-        print("[PingRequest] username={options.data}")
+        logging.info("[PingRequest] username={options.data}")
 
     if options.algo:
-        print("[PingRequest] algorithm={options.algo}")
+        logging.info("[PingRequest] algorithm={options.algo}")
 
     if options.public_key is None:
-        print("[PingRequest] You must provide a public_key! Closing...")   
+        logging.info("[PingRequest] You must provide a public_key! Closing...")   
         exit(1)
 
     if options.password is None:
-        print("[PingRequest] You must provide a password! Closing...")   
+        logging.info("[PingRequest] You must provide a password! Closing...")   
         exit(1)
 
     if options.username is None:
-        print("[PingRequest] You must provide a username! Closing...")   
+        logging.info("[PingRequest] You must provide a username! Closing...")   
         exit(1)
 
     # First we have to generate the session keys and authenticate into the server
@@ -120,7 +145,7 @@ def fuzz_ping_request(options):
     # TODO decrypt and check AuthResponse/Error
     global client_rx
 
-    for i in range(0, MAXFUZZ):
+    for i in range(0, options.rounds):
         ping_request=craft_ping_request(options.data, options.algo)
 
         ping_request_response=serialize_send_and_receive(ping_request)
@@ -147,6 +172,7 @@ def generate_session_keys(public_key):
 
 
 if __name__ == '__main__':    
+    
     parser = argparse.ArgumentParser(description='NSTP Fuzzer')
     
     requiredGroup = parser.add_argument_group('Required arguments')
@@ -158,6 +184,17 @@ if __name__ == '__main__':
                                 required = True,
                                 help='NSTP server IP. eg. --ip 192.168.1.2')
     
+    # Option for logging level.
+    parser.add_argument("--debug",
+                        help = "Print out debug messages.",
+                        action = "store_true",
+                        default = False)
+
+    # How many rounds do you want to fuzz?
+    parser.add_argument("--rounds",
+                        help = "How many rounds do you want to fuzz?",
+                        type = int,
+                        default = 10)
 
     # Options for the ClientHello.
     parser.add_argument("--client-hello",
@@ -241,6 +278,12 @@ if __name__ == '__main__':
 
     options= parser.parse_args()
 
+    # Setting logging level
+    if (options.debug):
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
     # IP and port are global so that send() function can obtain them easily
     global server_address
     server_address=(options.ip, options.port)
@@ -259,5 +302,5 @@ if __name__ == '__main__':
     elif options.store_request:
         fuzz_store_request(options)
     else:
-        print("No message selected. Closing.")
+        logging.error("No message selected. Closing.")
         exit(0)
