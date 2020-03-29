@@ -1,4 +1,4 @@
-import nstp_v3_pb2, ast
+import utils.nstp_v3_pb2, ast
 
 # If value provided remains None -> Just put a random value :) 
 
@@ -74,4 +74,5 @@ def craft_store_request(key=None, value=None, is_public=None):
     return proto_store_request
 
 def craft_load_request(key=None, is_public=None):
+    pass
     # TODO
