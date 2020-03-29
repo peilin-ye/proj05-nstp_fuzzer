@@ -157,7 +157,7 @@ if __name__ == '__main__':
                         help='[ClientHello] Fixed minor value to use. Otherwise, will be fuzzed.',
                         type=int,
                         default=None)      
-    parser.add_argument("--agent", 
+    parser.add_argument("--user_agent", 
                         help='[ClientHello] Fixed user agent to use. Otherwise, will be fuzzed.',
                         default=None)               
 
