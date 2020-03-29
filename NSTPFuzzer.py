@@ -100,6 +100,7 @@ def fuzz_ping_request(options):
     # First we have to generate the session keys and authenticate into the server
     generate_session_keys(options.public_key)
     auth_request=craft_auth_request(options.username, options.password)
+    auth_request_response=serialize_send_and_receive(auth_request)
 
     # TODO decrypt and check AuthResponse/Error
     global client_rx
