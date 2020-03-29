@@ -1,4 +1,4 @@
-import argparse
+import argparse, socket, struct
 import utils.ProtoCrafter
 import nacl.utils
 import utils.nstp_v3_pb2 as nstp_v3_pb2
@@ -7,38 +7,49 @@ import nacl.bindings.crypto_kx as crypto_kx
 from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretbox, crypto_secretbox_NONCEBYTES 
 from nacl.bindings.randombytes import randombytes
 
-def serialize_send_and_receive(unserialized_proto_message, encrypt=True):
-    global server_address
+MAXFUZZ = 5
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(server_address)
-        print("Sent: {0}".format(unserialized_proto_message))
-        bytes_to_send= obj.SerializeToString()
+CLIENT_HELLO      = 1   # client_hello = 1;
+SERVER_HELLO      = 2   # server_hello = 2;
+ERROR_MESSAGE     = 3   # error_message = 3;
+ENCRYPTED_MESSAGE = 4   # encrypted_message = 4;
 
-        if encrypt:
-            global client_tx
-            if client_tx==None:
-                print("Client TX key not generated. Closing.")
-                exit(1)
+def pack(x):
+    return (len(x).to_bytes(2, byteorder="big") + x)
 
-            nonce= randombytes(crypto_secretbox_NONCEBYTES)
-            encrypted_bytes= crypto_secretbox(bytes_to_send, nonce, client_tx)
-            nstp_message= nstp_v3_pb2.NSTPMessage()
-            nstp_message.encrypted_message.ciphertext= encrypted_bytes
-            nstp_message.encrypted_message.nonce= nonce
-            bytes_to_send= nstp_message.SerializeToString()
-        
-        sock.sendall(len(bytes_to_send).to_bytes(2, byteorder="big") + bytes_to_send)
+def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
+    nstp = nstp_v3_pb2.NSTPMessage()
+    
+    if msg_type == CLIENT_HELLO:
+        nstp.client_hello.CopyFrom(msg)
+    elif msg_type == SERVER_HELLO:
+        nstp.server_hello.CopyFrom(msg)
+    elif msg_type == ERROR_MESSAGE:
+        nstp.error_message.CopyFrom(msg)
+    elif msg_type == ENCRYPTED_MESSAGE:
+        global client_tx
+        if client_tx == None:
+            print("Client TX key not generated. Closing.")
+            exit(1)
+        nonce = randombytes(crypto_secretbox_NONCEBYTES)
+        encrypted_bytes = crypto_secretbox(bytes_to_send, nonce, client_tx)
+        nstp.encrypted_message.ciphertext = encrypted_bytes
+        nstp.encrypted_message.nonce = nonce
+        bytes_to_send = nstp.SerializeToString()
+    else:
+        print("serialize_send_and_receive(): Invalid msg_type!")
+        exit(1)
 
-        header = sock.recv(2)
-        message_length, = struct.unpack('>H', header) 
-        message= sock.recv(message_length)
+    sock.sendall(pack(nstp.SerializeToString()))
 
-        nstp_message= nstp_v3_pb2.NSTPMessage()
-        nstp_message.ParseFromString(message)
+    header = sock.recv(2)
+    message_length, = struct.unpack('>H', header) 
+    message= sock.recv(message_length)
 
-        # Here we shouldn't decrypt the message because we still don't know which type is it. We have to do it in each fuzz_...() function
-        return nstp_message
+    nstp = nstp_v3_pb2.NSTPMessage()
+    nstp.ParseFromString(message)
+    # Here we shouldn't decrypt the message because we still don't know which type is it. We have to do it in each fuzz_...() function
+    return nstp
 
 def fuzz_client_hello(options):
     if options.major:
@@ -50,10 +61,14 @@ def fuzz_client_hello(options):
     if options.public_key:
         print("[ClientHello] public_key={options.public_key}")
 
-    for i in range(0, 1000):
-        client_hello=craft_client_hello(options.major, options.minor, options.user_agent, options.public_key)
+    global server_address
 
-        clien_hello_response= serialize_send_and_receive(client_hello, encrypt=False)    
+    for i in range(0, MAXFUZZ):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect(server_address)
+            
+            client_hello = craft_client_hello(options.major, options.minor, options.user_agent, options.public_key)
+            clien_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
 
         # TODO check ServerHello/Error
 
@@ -70,7 +85,7 @@ def fuzz_auth_request(options):
     # TODO may be, this have to be in a loop? I mean, to send a client hello per AuthRequest? We'd have to adjust it as we test the servers
     generate_session_keys(options.public_key)
 
-    for i in range(0,1000):
+    for i in range(0, MAXFUZZ):
         auth_request=craft_auth_request(options.username, options.password)
 
         auth_request_response=serialize_send_and_receive(auth_request)
@@ -105,7 +120,7 @@ def fuzz_ping_request(options):
     # TODO decrypt and check AuthResponse/Error
     global client_rx
 
-    for i in range(0,1000):
+    for i in range(0, MAXFUZZ):
         ping_request=craft_ping_request(options.data, options.algo)
 
         ping_request_response=serialize_send_and_receive(ping_request)
@@ -131,10 +146,9 @@ def generate_session_keys(public_key):
     client_rx, client_tx = crypto_kx.crypto_kx_client_session_keys(client_public, client_private, server_public_key)
 
 
-if __name__ == '__main__':
-
+if __name__ == '__main__':    
     parser = argparse.ArgumentParser(description='NSTP Fuzzer')
-
+    
     requiredGroup = parser.add_argument_group('Required arguments')
     requiredGroup.add_argument('--port',
                                 help='NSTP server port. eg. --port 22300',

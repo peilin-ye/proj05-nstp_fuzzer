@@ -1,26 +1,22 @@
-import utils.nstp_v3_pb2, ast
+import ast
+import utils.nstp_v3_pb2 as nstp_v3_pb2
 
 # If value provided remains None -> Just put a random value :) 
 
+def random():
+    # TODO This is just a place holder.
+    return 42
+
 def craft_client_hello(major=None, minor=None, user_agent=None, public_key=None):
+    client_hello = nstp_v3_pb2.ClientHello()
     
     # TODO replace random() functions with real rand(), according to field type
-    if major is None:
-        major=random()
+    client_hello.major_version = random() if (major is None) else major 
+    client_hello.minor_version = random() if (minor is None) else minor
+    client_hello.user_agent = str(random()) if (user_agent is None) else user_agent
+    client_hello.public_key = str(random()).encode() if (public_key is None) else public_key
 
-    if minor is None:
-        minor=random()
-
-    if user_agent is None:
-        user_agent=random()
-
-    if public_key is None:
-        public_key=random()
-
-    # TODO Now that we have all the values, Serialize to protobuf!
-    proto_client_hello= nstp_v3_pb2.ClientHello()
-
-    return proto_client_hello
+    return client_hello
 
 def craft_auth_request(username=None, password=None):
 
