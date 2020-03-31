@@ -277,7 +277,7 @@ if __name__ == '__main__':
                         default=None)
     parser.add_argument("--fuzz_field_len", 
                     help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] maximum length for variable length data, default is 512',
-                    default=None)           
+                    default=1024)           
 
     options= parser.parse_args()
 

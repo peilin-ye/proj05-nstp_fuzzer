@@ -5,7 +5,7 @@ import ast
 import secrets
 
 def random(attribute_type=None, fuzz_len=None):
-    length = rand.randint(0,512) if (fuzz_len is None) else int(fuzz_len)
+    length = rand.randint(0, 1024) if (fuzz_len is None) else int(fuzz_len)
     if attribute_type == 'str':
         letters = string.printable  
         return ''.join(rand.choice(letters) for i in range(length))
