@@ -81,25 +81,30 @@ def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
     return receive_nstp(sock)
 
 def fuzz_client_hello(options):
-    if options.major:
-        logging.info("[ClientHello] major={options.major}")
-    if options.minor:
-        logging.info("[ClientHello] minor={options.minor}")
-    if options.user_agent:
-        logging.info("[ClientHello] user_agent={options.user_agent}")
-    if options.public_key:
-        logging.info("[ClientHello] public_key={options.public_key}")
-
+    global client_public
     global server_address
+    
+    if options.major:
+        logging.info("[ClientHello] major = {0}".format(options.major))
+    if options.minor:
+        logging.info("[ClientHello] minor = {0}".format(options.minor))
+    if options.user_agent:
+        logging.info("[ClientHello] user_agent = {0}".format(options.user_agent))
+    if options.keys:
+        logging.info("[ClientHello] public_key = {0} (loaded from \"./keys\")".format(client_public))
+    else:
+        client_public, _ = crypto_kx.crypto_kx_keypair()
+        logging.info("[ClientHello] public_key: {0} (randomly generated)".format(client_public))
 
     for i in range(0, options.rounds):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(server_address)
             
-            client_hello = craft_client_hello(options.major, options.minor, options.user_agent, options.public_key)
+            client_hello = craft_client_hello(options.major, options.minor, options.user_agent, client_public)
             clien_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
 
         # TODO check ServerHello/Error
+    logging.info("[ClientHello] sent {0} ClientHello.".format(options.rounds))
 
 def fuzz_auth_request(options):
     if options.username:
@@ -107,17 +112,18 @@ def fuzz_auth_request(options):
     if options.password:
         logging.info("[AuthRequest] password={options.password}")    
     
-    if options.public_key is None:
+    if options.keys is None:
         logging.info("[AuthRequest] You must provide a public_key! Closing...")   
         exit(1)
 
-    # TODO may be, this have to be in a loop? I mean, to send a client hello per AuthRequest? We'd have to adjust it as we test the servers
-    generate_session_keys(options.public_key)
+    global server_address
 
     for i in range(0, options.rounds):
-        auth_request=craft_auth_request(options.username, options.password)
-
-        auth_request_response=serialize_send_and_receive(auth_request)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect(server_address)
+            generate_session_keys(sock, options.public_key)
+            auth_request = craft_auth_request(options.username, options.password)
+            auth_request_response = serialize_send_and_receive(auth_request, msg_type=ENCRYPTED_MESSAGE)
 
         # TODO decrypt and check AuthResponse/Error
         global client_rx
@@ -164,10 +170,10 @@ def fuzz_store_request(options):
     # TODO. See PingRequest 
     pass
 
-def generate_session_keys(public_key):
-    client_hello=craft_client_hello(1, 1, 'user_agent_test', public_key)
-    nstp_message_server_hello= serialize_send_and_receive(client_hello, encrypt=False)
-    server_public_key=nstp_message_server_hello.server_hello.public_key
+def generate_session_keys(sock, public_key):
+    client_hello = craft_client_hello(3, 0, 'user_agent', public_key)
+    nstp_message_server_hello = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)
+    server_public_key = nstp_message_server_hello.server_hello.public_key
 
     # Generate the session keys
     global client_public, client_private
@@ -270,8 +276,9 @@ if __name__ == '__main__':
                         default=None)
 
     # Parse required arguments for AuthenticationRequest, PingRequest, StoreRequest and LoadRequest
-    parser.add_argument("--public-key", 
-                        help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Valid public key to exchange with server.',
+    parser.add_argument("--keys", 
+                        help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Load key pairs from file "./keys".',
+                        action = "store_true",
                         default=None) 
     parser.add_argument("--username", 
                         help='[AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Valid user to log into the server.',
@@ -287,13 +294,28 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.DEBUG)
     else:
         logging.basicConfig(level=logging.INFO)
-
+        
     # IP and port are global so that send() function can obtain them easily
     global server_address
     server_address=(options.ip, options.port)
 
     global client_public, client_private
-    client_public, client_private= crypto_kx.crypto_kx_keypair()
+    if (options.keys):
+        # load from "./keys"
+        try:
+            f = open("./keys", "rb")
+            client_public = f.read(32)
+            client_private = f.read(32)
+            logging.debug("Loaded client key pair from file \"./keys\".")
+            logging.debug("client_public: {0}".format(client_public))
+            logging.debug("client_private: {0}".format(client_private))
+        except FileNotFoundError:
+            logging.error("\"./keys\" does not exist!")
+            exit(1)
+    else:
+        # randomly generate
+        logging.debug("Client key pairs will be generate randomly!")
+       
 
     if options.client_hello:
         fuzz_client_hello(options)
@@ -307,4 +329,4 @@ if __name__ == '__main__':
         fuzz_store_request(options)
     else:
         logging.error("No message selected. Closing.")
-        exit(0)
+        exit(1)
