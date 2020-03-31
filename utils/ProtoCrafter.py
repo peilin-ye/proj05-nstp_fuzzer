@@ -22,7 +22,7 @@ def craft_client_hello(major=None, minor=None, user_agent=None, public_key=None)
     client_hello.major_version = random('int') if (major is None) else major 
     client_hello.minor_version = random('int') if (minor is None) else minor
     client_hello.user_agent = random('str') if (user_agent is None) else user_agent
-    client_hello.public_key = random('str').encode() if (public_key is None) else public_key
+    client_hello.public_key = random() if (public_key is None) else public_key
 
     return client_hello
 
