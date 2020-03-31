@@ -1,6 +1,7 @@
 import utils.nstp_v3_pb2 as nstp_v3_pb2
 import random as rand
 import string
+import ast
 import secrets
 
 def random(attribute_type=None):
@@ -22,7 +23,7 @@ def craft_client_hello(major=None, minor=None, user_agent=None, public_key=None)
     client_hello.major_version = random('int') if (major is None) else major 
     client_hello.minor_version = random('int') if (minor is None) else minor
     client_hello.user_agent = random('str') if (user_agent is None) else user_agent
-    client_hello.public_key = random() if (public_key is None) else public_key
+    client_hello.public_key = random() if (public_key is None) else ast.literal_eval(public_key)
 
     return client_hello
 
@@ -35,7 +36,7 @@ def craft_auth_request(username=None, password=None):
 
 def craft_ping_request(data=None, algorithm=None):
     ping_request = nstp_v3_pb2.PingRequest()
-    ping_request.data = random() if (data is None) else data
+    ping_request.data = random() if (data is None) else ast.literal_eval(data)
     ping_request.hash_algorithm = random('hash_algorithm') if (algorithm is None) else algorithm
 
     return ping_request
@@ -43,7 +44,7 @@ def craft_ping_request(data=None, algorithm=None):
 def craft_store_request(key=None, value=None, is_public=None):
     store_request = nstp_v3_pb2.StoreRequest()
     store_request.key = random('str') if (key is None) else key
-    store_request.value = random() if (value is None) else value
+    store_request.value = random() if (value is None) else ast.literal_eval(value)  
     store_request.public = random('bool') if (is_public is None) else is_public
 
     return store_request
