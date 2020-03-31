@@ -44,6 +44,8 @@ def receive_nstp(sock):
     nstp.ParseFromString(payload)
     msg_type = nstp.WhichOneof("message_")
     logging.debug("receive_ntsp(): received {0} from the server, length: {1}".format(msg_type, length))
+    if (options.debug):
+        print(nstp)
     return nstp
 
 def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
@@ -71,6 +73,8 @@ def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
 
     bytes_to_send = nstp.SerializeToString()
     logging.debug("serialize_send_and_receive(): sending {0} to the server, length: {1}".format(nstp.WhichOneof("message_"), len(bytes_to_send)))
+    if (options.debug):
+        print(nstp)
     sock.sendall(pack(bytes_to_send))
     
     # Here we shouldn't decrypt the message because we still don't know which type is it. We have to do it in each fuzz_...() function
