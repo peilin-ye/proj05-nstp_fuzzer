@@ -3,8 +3,8 @@ import random as rand
 import string
 import secrets
 
-def random(attribute_type=None, length=None):
-    length = rand.randint(0,512) if (length is None) else length
+def random(attribute_type=None):
+    length = rand.randint(0,512)
     if attribute_type == 'str':
         letters = string.printable  
         return ''.join(rand.choice(letters) for i in range(length))
