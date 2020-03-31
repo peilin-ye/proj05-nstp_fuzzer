@@ -106,6 +106,9 @@ def fuzz_client_hello(options):
     logging.info("[ClientHello] sent {0} ClientHello.".format(options.rounds))
 
 def fuzz_auth_request(options):
+    global client_public, client_private
+    global server_address
+    
     if options.username:
         logging.info("[AuthRequest] username = {0}".format(options.username))
     if options.password:
@@ -114,12 +117,10 @@ def fuzz_auth_request(options):
     if options.keys is None:
         logging.info("[AuthRequest] client keys will be randomly generated!")
 
-    global server_address
-
     for i in range(0, options.rounds):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(server_address)
-            generate_session_keys(sock, options.public_key)
+            generate_session_keys(sock, options.keys)
             auth_request = craft_auth_request(options.username, options.password)
             auth_request_response = serialize_send_and_receive(auth_request, msg_type=ENCRYPTED_MESSAGE)
 
@@ -168,15 +169,23 @@ def fuzz_store_request(options):
     # TODO. See PingRequest 
     pass
 
-def generate_session_keys(sock, public_key):
-    client_hello = craft_client_hello(3, 0, 'user_agent', public_key)
-    nstp_message_server_hello = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)
-    server_public_key = nstp_message_server_hello.server_hello.public_key
-
-    # Generate the session keys
+def generate_session_keys(sock, keys):
     global client_public, client_private
     global client_rx, client_tx
-    client_rx, client_tx = crypto_kx.crypto_kx_client_session_keys(client_public, client_private, server_public_key)
+    
+    if keys is None:
+        # generate key pair everytime
+        client_public, client_private = crypto_kx.crypto_kx_keypair()
+        logging.debug("Generated new client key pair.")
+        logging.debug("new client_public: {0}".format(client_public))
+        logging.debug("new client_private: {0}".format(client_private))
+    
+    client_hello = craft_client_hello(3, 0, 'user_agent', public_key)
+    nstp_message_server_hello = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)
+    server_public = nstp_message_server_hello.server_hello.public_key
+
+    # Generate the session keys
+    client_rx, client_tx = crypto_kx.crypto_kx_client_session_keys(client_public, client_private, server_public)
 
 
 if __name__ == '__main__':    
