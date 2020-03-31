@@ -10,7 +10,7 @@ from nacl.bindings.randombytes import randombytes
 CLIENT_HELLO      = 1   # client_hello = 1;
 SERVER_HELLO      = 2   # server_hello = 2;
 ERROR_MESSAGE     = 3   # error_message = 3;
-ENCRYPTED_MESSAGE = 4   # encrypted_message = 4;
+DECRYPTED_MESSAGE = 4   # decrypted_message = 4;
 
 def pack(x):
     return (len(x).to_bytes(2, byteorder="big") + x)
@@ -48,7 +48,7 @@ def receive_nstp(sock):
         print(nstp)
     return nstp
 
-def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
+def serialize_send_and_receive(msg, sock, msg_type=DECRYPTED_MESSAGE):
     nstp = nstp_v3_pb2.NSTPMessage()
     
     if msg_type == CLIENT_HELLO:
@@ -57,13 +57,18 @@ def serialize_send_and_receive(msg, sock, msg_type=ENCRYPTED_MESSAGE):
         nstp.server_hello.CopyFrom(msg)
     elif msg_type == ERROR_MESSAGE:
         nstp.error_message.CopyFrom(msg)
-    elif msg_type == ENCRYPTED_MESSAGE:
+    elif msg_type == DECRYPTED_MESSAGE:
         global client_tx
         if client_tx == None:
             logging.error("serialize_send_and_receive(): Client TX key not generated!")
             exit(1)
+            
+        if (options.debug):
+            logging.debug("serialize_send_and_receive(): encrypting message:")
+            print(msg)
+            
         nonce = randombytes(crypto_secretbox_NONCEBYTES)
-        encrypted_bytes = crypto_secretbox(bytes_to_send, nonce, client_tx)
+        encrypted_bytes = crypto_secretbox(msg.SerializeToString(), nonce, client_tx)
         nstp.encrypted_message.ciphertext = encrypted_bytes
         nstp.encrypted_message.nonce = nonce
         bytes_to_send = nstp.SerializeToString()
@@ -91,9 +96,9 @@ def fuzz_client_hello(options):
     if options.user_agent:
         logging.info("[ClientHello] user_agent = {0}".format(options.user_agent))
     if options.keys:
-        logging.info("[ClientHello] public_key = {0} (loaded from \"./keys\")".format(client_public))
+        logging.info("[ClientHello] client_public = {0} (loaded from \"./keys\")".format(client_public))
     else:
-        logging.info("[ClientHello] public_key will be randomly generated".format(client_public))
+        logging.info("[ClientHello] client_public will be randomly generated".format(client_public))
 
     for i in range(0, options.rounds):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -112,7 +117,7 @@ def fuzz_auth_request(options):
     if options.username:
         logging.info("[AuthRequest] username = {0}".format(options.username))
     if options.password:
-        logging.info("[AuthRequest] password={0}".format(options.password))    
+        logging.info("[AuthRequest] password = {0}".format(options.password))    
     
     if options.keys is None:
         logging.info("[AuthRequest] client keys will be randomly generated!")
@@ -120,9 +125,14 @@ def fuzz_auth_request(options):
     for i in range(0, options.rounds):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(server_address)
+            # First, send a ClientHello to get the server public key
             generate_session_keys(sock, options.keys)
+            # Then, craft a AuthenticationRequest and wrap it into DecrypedMessage
             auth_request = craft_auth_request(options.username, options.password)
-            auth_request_response = serialize_send_and_receive(auth_request, msg_type=ENCRYPTED_MESSAGE)
+            decrypted_message = nstp_v3_pb2.DecryptedMessage()
+            decrypted_message.auth_request.CopyFrom(auth_request)
+            # Finally, serialize, encrypt the DecryptedMessage and wrap it into NSTPMessage
+            auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
         # TODO decrypt and check AuthResponse/Error
         global client_rx
@@ -134,8 +144,8 @@ def fuzz_ping_request(options):
     if options.algo:
         logging.info("[PingRequest] algorithm={options.algo}")
 
-    if options.public_key is None:
-        logging.info("[PingRequest] You must provide a public_key! Closing...")   
+    if options.keys is None:
+        logging.info("[PingRequest] You must provide a keys! Closing...")   
         exit(1)
 
     if options.password is None:
@@ -180,7 +190,7 @@ def generate_session_keys(sock, keys):
         logging.debug("new client_public: {0}".format(client_public))
         logging.debug("new client_private: {0}".format(client_private))
     
-    client_hello = craft_client_hello(3, 0, 'user_agent', public_key)
+    client_hello = craft_client_hello(3, 0, 'user_agent', client_public)
     nstp_message_server_hello = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)
     server_public = nstp_message_server_hello.server_hello.public_key
 
