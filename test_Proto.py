@@ -9,13 +9,13 @@ def test_craft_load_request():
 	assert crafted_load.public == True
 
 def test_craft_store_request():
-	crafted_store = pc.craft_store_request(key="test_key", value=b'test_value', is_public=True)
+	crafted_store = pc.craft_store_request(key="test_key", value="b'test_value'", is_public=True)
 	assert crafted_store.key == "test_key"
 	assert crafted_store.value == b'test_value'
 	assert crafted_store.public == True
 
 def test_craft_ping_request():
-	crafted_ping = pc.craft_ping_request(data=b'test_data', algorithm=2)
+	crafted_ping = pc.craft_ping_request(data="b'test_data'", algorithm=2)
 	assert crafted_ping.data == b'test_data'
 	assert crafted_ping.hash_algorithm == 2
 
@@ -25,7 +25,7 @@ def test_craft_auth_request():
 	assert crafted_auth.password == "test_password"
 
 def test_craft_client_hello():
-	crafted_hello = pc.craft_client_hello(major=3, minor=1, user_agent="test_agent", public_key=b'test_key')
+	crafted_hello = pc.craft_client_hello(major=3, minor=1, user_agent="test_agent", public_key="b'test_key'")
 	assert crafted_hello.major_version == 3
 	assert crafted_hello.minor_version == 1
 	assert crafted_hello.user_agent == "test_agent"
@@ -64,3 +64,8 @@ def test_craft_auth_request_random():
 	print("random auth request example")
 	print("auth username {}".format(crafted_auth.username))
 	print("auth password {}".format(crafted_auth.password))
+
+def test_fuzz_len():
+	for i in range(10):
+		crafted_hello = pc.craft_client_hello(length=2)
+		assert len(crafted_hello.user_agent) <= 2
