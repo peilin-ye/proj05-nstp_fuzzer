@@ -92,7 +92,7 @@ def fuzz_client_hello(options):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(server_address)
             
-            client_hello = craft_client_hello(options.major, options.minor, options.user_agent, options.public_key)
+            client_hello = craft_client_hello(options.major, options.minor, options.user_agent, options.public_key, options.fuzz_field_len)
             clien_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
 
         # TODO check ServerHello/Error
@@ -111,7 +111,7 @@ def fuzz_auth_request(options):
     generate_session_keys(options.public_key)
 
     for i in range(0, options.rounds):
-        auth_request=craft_auth_request(options.username, options.password)
+        auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
 
         auth_request_response=serialize_send_and_receive(auth_request)
 
@@ -139,14 +139,14 @@ def fuzz_ping_request(options):
 
     # First we have to generate the session keys and authenticate into the server
     generate_session_keys(options.public_key)
-    auth_request=craft_auth_request(options.username, options.password)
+    auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
     auth_request_response=serialize_send_and_receive(auth_request)
 
     # TODO decrypt and check AuthResponse/Error
     global client_rx
 
     for i in range(0, options.rounds):
-        ping_request=craft_ping_request(options.data, options.algo)
+        ping_request=craft_ping_request(options.data, options.algo, options.fuzz_field_len)
 
         ping_request_response=serialize_send_and_receive(ping_request)
 
@@ -274,7 +274,10 @@ if __name__ == '__main__':
                         default=None)
     parser.add_argument("--password", 
                         help='[AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Valid password to log into the server.',
-                        default=None)          
+                        default=None)
+    parser.add_argument("--fuzz_field_len", 
+                    help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] maximum length for variable length data, default is 512',
+                    default=1024)           
 
     options= parser.parse_args()
 

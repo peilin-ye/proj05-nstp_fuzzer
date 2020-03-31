@@ -1,54 +1,57 @@
-import ast
 import utils.nstp_v3_pb2 as nstp_v3_pb2
+import random as rand
+import string
+import ast
+import secrets
 
-# If value provided remains None -> Just put a random value :) 
+def random(attribute_type=None, fuzz_len=None):
+    length = rand.randint(0, 1024) if (fuzz_len is None) else int(fuzz_len)
+    if attribute_type == 'str':
+        letters = string.printable  
+        return ''.join(rand.choice(letters) for i in range(length))
+    elif attribute_type == 'int':
+        return rand.randint(0,pow(2,32) -1)
+    elif attribute_type == 'bool':
+        return rand.randint(0,1) == 1
+    elif attribute_type == 'hash_algorithm':
+        return rand.randint(0,2)
+    else:
+        return secrets.token_bytes(length)
 
-def random():
-    # TODO This is just a place holder.
-    return 42
-
-def craft_client_hello(major=None, minor=None, user_agent=None, public_key=None):
+def craft_client_hello(major=None, minor=None, user_agent=None, public_key=None, length=None):
     client_hello = nstp_v3_pb2.ClientHello()
-    
-    # TODO replace random() functions with real rand(), according to field type
-    client_hello.major_version = random() if (major is None) else major 
-    client_hello.minor_version = random() if (minor is None) else minor
-    client_hello.user_agent = str(random()) if (user_agent is None) else user_agent
-    client_hello.public_key = str(random()).encode() if (public_key is None) else public_key
+    client_hello.major_version = random('int', length) if (major is None) else major 
+    client_hello.minor_version = random('int', length) if (minor is None) else minor
+    client_hello.user_agent = random('str', length) if (user_agent is None) else user_agent
+    client_hello.public_key = random(fuzz_len=length) if (public_key is None) else ast.literal_eval(public_key)
 
     return client_hello
 
-def craft_auth_request(username=None, password=None):
+def craft_auth_request(username=None, password=None, length=None):
     auth_request = nstp_v3_pb2.AuthenticationRequest()
-
-    # TODO replace random() functions with real rand(), according to field type
-    auth_request.username = str(random()) if (username is None) else username
-    auth_request.password = str(random()) if (password is None) else password
+    auth_request.username = random('str', length) if (username is None) else username
+    auth_request.password = random('str', length) if (password is None) else password
 
     return auth_request
 
-def craft_ping_request(data=None, algorithm=None):
+def craft_ping_request(data=None, algorithm=None, length=None):
     ping_request = nstp_v3_pb2.PingRequest()
-    
-    # TODO replace random() functions with real rand(), according to field type
-    ping_request.data = str(random()).encode() if (data is None) else ast.literal_eval(data)
-    ping_request.hash_algorithm = random() if (algorithm is None) else algorithm
+    ping_request.data = random(fuzz_len=length) if (data is None) else ast.literal_eval(data)
+    ping_request.hash_algorithm = random('hash_algorithm', length) if (algorithm is None) else algorithm
 
     return ping_request
 
-def craft_store_request(key=None, value=None, is_public=None):
+def craft_store_request(key=None, value=None, is_public=None, length=None):
     store_request = nstp_v3_pb2.StoreRequest()
-    
-    # TODO replace random() functions with real rand(), according to field type
-    store_request.key = str(random()) if (key is None) else key
-    store_request.value = str(random()).encode() if (value is None) else ast.literal_eval(value)
-    store_request.is_public = bool(random()) if (is_public is None) else is_public
+    store_request.key = random('str', length) if (key is None) else key
+    store_request.value = random(fuzz_len=length) if (value is None) else ast.literal_eval(value)  
+    store_request.public = random('bool', length) if (is_public is None) else is_public
 
     return store_request
 
-def craft_load_request(key=None, is_public=None):
+def craft_load_request(key=None, is_public=None, length=None):
     load_request = nstp_v3_pb2.LoadRequest()
+    load_request.key = random('str', length) if (key is None) else key
+    load_request.public = random('bool', length) if (is_public is None) else is_public
 
-    # TODO replace random() functions with real rand(), according to field type
-    load_request.key = str(random()) if (key is None) else key
-    load_request.is_public = bool(random()) if (is_public is None) else is_public
+    return load_request
