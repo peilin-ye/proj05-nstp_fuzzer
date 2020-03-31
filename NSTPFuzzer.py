@@ -93,8 +93,7 @@ def fuzz_client_hello(options):
     if options.keys:
         logging.info("[ClientHello] public_key = {0} (loaded from \"./keys\")".format(client_public))
     else:
-        client_public, _ = crypto_kx.crypto_kx_keypair()
-        logging.info("[ClientHello] public_key: {0} (randomly generated)".format(client_public))
+        logging.info("[ClientHello] public_key will be randomly generated".format(client_public))
 
     for i in range(0, options.rounds):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -108,13 +107,12 @@ def fuzz_client_hello(options):
 
 def fuzz_auth_request(options):
     if options.username:
-        logging.info("[AuthRequest] username={options.username}")
+        logging.info("[AuthRequest] username = {0}".format(options.username))
     if options.password:
-        logging.info("[AuthRequest] password={options.password}")    
+        logging.info("[AuthRequest] password={0}".format(options.password))    
     
     if options.keys is None:
-        logging.info("[AuthRequest] You must provide a public_key! Closing...")   
-        exit(1)
+        logging.info("[AuthRequest] client keys will be randomly generated!")
 
     global server_address
 
@@ -314,7 +312,7 @@ if __name__ == '__main__':
             exit(1)
     else:
         # randomly generate
-        logging.debug("Client key pairs will be generate randomly!")
+        pass
        
 
     if options.client_hello:
