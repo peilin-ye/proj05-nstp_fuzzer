@@ -98,7 +98,8 @@ def fuzz_client_hello(options):
     if options.keys:
         logging.info("[ClientHello] client_public = {0} (loaded from \"./keys\")".format(client_public))
     else:
-        logging.info("[ClientHello] client_public will be randomly generated".format(client_public))
+        logging.info("[ClientHello] client_public will be randomly generated")
+        client_public = 0
 
     for i in range(0, options.rounds):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:

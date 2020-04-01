@@ -18,12 +18,12 @@ def random(attribute_type=None, fuzz_len=None):
     else:
         return secrets.token_bytes(length)
 
-def craft_client_hello(major=None, minor=None, user_agent=None, public_key=None, length=None):
+def craft_client_hello(major=None, minor=None, user_agent=None, client_public=None, length=None):
     client_hello = nstp_v3_pb2.ClientHello()
     client_hello.major_version = random('int', length) if (major is None) else major 
     client_hello.minor_version = random('int', length) if (minor is None) else minor
     client_hello.user_agent = random('str', length) if (user_agent is None) else user_agent
-    client_hello.public_key = random(fuzz_len=length) if (public_key is None) else ast.literal_eval(public_key)
+    client_hello.public_key = random(fuzz_len=length) if (not client_public) else client_public
 
     return client_hello
 
