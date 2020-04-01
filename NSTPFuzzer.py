@@ -104,11 +104,7 @@ def fuzz_client_hello(options):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(server_address)
             
-<<<<<<< HEAD
             client_hello = craft_client_hello(options.major, options.minor, options.user_agent, client_public, options.fuzz_field_len)
-=======
-            client_hello = craft_client_hello(options.major, options.minor, options.user_agent, options.public_key, options.fuzz_field_len)
->>>>>>> master
             clien_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
 
         # TODO check ServerHello/Error
@@ -127,7 +123,6 @@ def fuzz_auth_request(options):
         logging.info("[AuthRequest] client keys will be randomly generated!")
 
     for i in range(0, options.rounds):
-<<<<<<< HEAD
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(server_address)
             # First, send a ClientHello to get the server public key
@@ -138,11 +133,6 @@ def fuzz_auth_request(options):
             decrypted_message.auth_request.CopyFrom(auth_request)
             # Finally, serialize, encrypt the DecryptedMessage and wrap it into NSTPMessage
             auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
-=======
-        auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
-
-        auth_request_response=serialize_send_and_receive(auth_request)
->>>>>>> master
 
         # TODO decrypt and check AuthResponse/Error
         global client_rx
@@ -312,17 +302,10 @@ if __name__ == '__main__':
                         default=None)
     parser.add_argument("--password", 
                         help='[AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Valid password to log into the server.',
-<<<<<<< HEAD
-                        default=None)         
-    parser.add_argument("--fuzz_field_len", 
-                help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] maximum length for variable length data, default is 512',
-                default=1024) 
-=======
                         default=None)
     parser.add_argument("--fuzz_field_len", 
                     help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] maximum length for variable length data, default is 512',
                     default=1024)           
->>>>>>> master
 
     options= parser.parse_args()
 
