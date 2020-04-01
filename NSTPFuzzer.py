@@ -104,7 +104,7 @@ def fuzz_client_hello(options):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(server_address)
             
-            client_hello = craft_client_hello(options.major, options.minor, options.user_agent, client_public)
+            client_hello = craft_client_hello(options.major, options.minor, options.user_agent, client_public, options.fuzz_field_len)
             clien_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
 
         # TODO check ServerHello/Error
@@ -128,7 +128,7 @@ def fuzz_auth_request(options):
             # First, send a ClientHello to get the server public key
             generate_session_keys(sock, options.keys)
             # Then, craft a AuthenticationRequest and wrap it into DecrypedMessage
-            auth_request = craft_auth_request(options.username, options.password)
+            auth_request = craft_auth_request(options.username, options.password, options.fuzz_field_len)
             decrypted_message = nstp_v3_pb2.DecryptedMessage()
             decrypted_message.auth_request.CopyFrom(auth_request)
             # Finally, serialize, encrypt the DecryptedMessage and wrap it into NSTPMessage
@@ -158,14 +158,14 @@ def fuzz_ping_request(options):
 
     # First we have to generate the session keys and authenticate into the server
     generate_session_keys(options.public_key)
-    auth_request=craft_auth_request(options.username, options.password)
+    auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
     auth_request_response=serialize_send_and_receive(auth_request)
 
     # TODO decrypt and check AuthResponse/Error
     global client_rx
 
     for i in range(0, options.rounds):
-        ping_request=craft_ping_request(options.data, options.algo)
+        ping_request=craft_ping_request(options.data, options.algo, options.fuzz_field_len)
 
         ping_request_response=serialize_send_and_receive(ping_request)
 
@@ -190,7 +190,7 @@ def generate_session_keys(sock, keys):
         logging.debug("new client_public: {0}".format(client_public))
         logging.debug("new client_private: {0}".format(client_private))
     
-    client_hello = craft_client_hello(3, 0, 'user_agent', client_public)
+    client_hello = craft_client_hello(3, 0, 'user_agent', client_public, options.fuzz_field_len)
     nstp_message_server_hello = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)
     server_public = nstp_message_server_hello.server_hello.public_key
 
@@ -302,7 +302,10 @@ if __name__ == '__main__':
                         default=None)
     parser.add_argument("--password", 
                         help='[AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Valid password to log into the server.',
-                        default=None)          
+                        default=None)         
+    parser.add_argument("--fuzz_field_len", 
+                help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] maximum length for variable length data, default is 512',
+                default=1024) 
 
     options= parser.parse_args()
 
