@@ -11,10 +11,10 @@ def random(attribute_type=None, fuzz_len=None):
         return ''.join(rand.choice(letters) for i in range(length))
     elif attribute_type == 'int':
         return rand.randint(0,pow(2,32) -1)
+    elif attribute_type == 'hash_algorithm':
+        return rand.randint(0,pow(2,16) -1) * pow(-1,rand.randint(1,2))
     elif attribute_type == 'bool':
         return rand.randint(0,1) == 1
-    elif attribute_type == 'hash_algorithm':
-        return rand.randint(0,2)
     else:
         return secrets.token_bytes(length)
 
