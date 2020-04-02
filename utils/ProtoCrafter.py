@@ -12,7 +12,7 @@ def random(attribute_type=None, fuzz_len=None):
     elif attribute_type == 'int':
         return rand.randint(0,pow(2,32) -1)
     elif attribute_type == 'hash_algorithm':
-        return rand.randint(0,pow(2,16) -1) * pow(-1,rand.randint(1,2))
+        return (rand.randint(0,pow(2,16)) * pow(-1,rand.randint(1,2))) -1
     elif attribute_type == 'bool':
         return rand.randint(0,1) == 1
     else:

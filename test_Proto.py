@@ -25,7 +25,7 @@ def test_craft_auth_request():
 	assert crafted_auth.password == "test_password"
 
 def test_craft_client_hello():
-	crafted_hello = pc.craft_client_hello(major=3, minor=1, user_agent="test_agent", public_key="b'test_key'")
+	crafted_hello = pc.craft_client_hello(major=3, minor=1, user_agent="test_agent", client_public=b'test_key')
 	assert crafted_hello.major_version == 3
 	assert crafted_hello.minor_version == 1
 	assert crafted_hello.user_agent == "test_agent"
