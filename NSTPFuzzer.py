@@ -2,7 +2,7 @@ import argparse, socket, struct, logging
 import utils.ProtoCrafter
 import nacl.utils
 import utils.nstp_v3_pb2 as nstp_v3_pb2
-from utils.ProtoCrafter import craft_client_hello, craft_auth_request # TODO Add missing imports here 
+from utils.ProtoCrafter import craft_client_hello, craft_auth_request, craft_load_request, craft_store_request # TODO Add missing imports here 
 import nacl.bindings.crypto_kx as crypto_kx
 from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretbox, crypto_secretbox_NONCEBYTES 
 from nacl.bindings.randombytes import randombytes
@@ -173,12 +173,100 @@ def fuzz_ping_request(options):
         # TODO decrypt and check PingResponse/Error
 
 def fuzz_load_request(options):
-    # TODO. See PingRequest 
-    pass
+    global server_address
+
+    if options.load_key:
+        logging.info("[LoadRequest] Load Request key={options.load_key}")
+
+    if options.load_public_key:
+        logging.info("[LoadRequest] Load Request public={options.load_public_key}}")
+
+    if options.keys is None:
+        logging.info("[LoadRequest] client keys not provided, will be randomly generated!")
+
+    if options.password is None:
+        logging.info("[LoadRequest] You must provide a password! Closing...")   
+        exit(1)
+
+    if options.username is None:
+        logging.info("[LoadRequest] You must provide a username! Closing...")   
+        exit(1)
+    
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(server_address)
+        # First generate the session keys and authenticate into the server
+        generate_session_keys(sock, options.keys)
+        auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
+        decrypted_message = nstp_v3_pb2.DecryptedMessage()
+        decrypted_message.auth_request.CopyFrom(auth_request)
+        auth_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
+
+        # TODO decrypt and check LoadResponse/Error
+        global client_rx
+
+        # parse load_public_key flag to boolean
+        if options.load_public_key:
+            public_key = options.load_public_key.lower() in ['true', '1', 't', 'y', 'yes']
+        else:
+            public_key = None
+
+        for i in range(0, options.rounds):
+            load_request = craft_load_request(options.load_key, public_key, options.fuzz_field_len)
+            decrypted_message = nstp_v3_pb2.DecryptedMessage()
+            decrypted_message.load_request.CopyFrom(load_request)
+            load_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
+
+            # TODO decrypt and check LoadResponse/Error
 
 def fuzz_store_request(options):
-    # TODO. See PingRequest 
-    pass
+    global server_address
+
+    if options.store_key:
+        logging.info("[StoreRequest] Store Request key={options.store_key}")
+
+    if options.store_value:
+        logging.info("[StoreRequest] Store Request public={options.store_value}}")
+    
+    if options.store_public_key:
+        logging.info("[StoreRequest] Store Request key={options.store_public_key}")
+
+    if options.keys is None:
+        logging.info("[StoreRequest] client keys not provided, will be randomly generated!")
+
+    if options.password is None:
+        logging.info("[StoreRequest] You must provide a password! Closing...")   
+        exit(1)
+
+    if options.username is None:
+        logging.info("[StoreRequest] You must provide a username! Closing...")   
+        exit(1)
+    
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(server_address)
+        # First generate the session keys and authenticate into the server
+        generate_session_keys(sock, options.keys)
+        auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
+        decrypted_message = nstp_v3_pb2.DecryptedMessage()
+        decrypted_message.auth_request.CopyFrom(auth_request)
+        auth_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
+
+        # TODO decrypt and check LoadResponse/Error
+        global client_rx
+
+        # parse load_public_key flag to boolean
+        if options.store_public_key:
+            public_key = options.store_public_key.lower() in ['true', '1', 't', 'y', 'yes']
+        else:
+            public_key = None
+
+        for i in range(0, options.rounds):
+            store_request = craft_store_request(options.store_key, options.store_value, public_key, options.fuzz_field_len)
+            decrypted_message = nstp_v3_pb2.DecryptedMessage()
+            decrypted_message.store_request.CopyFrom(store_request)
+            store_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
+
+            # TODO decrypt and check LoadResponse/Error
+    
 
 def generate_session_keys(sock, keys):
     global client_public, client_private
@@ -308,7 +396,7 @@ if __name__ == '__main__':
                     help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] maximum length for variable length data, default is 512',
                     default=1024)           
 
-    options= parser.parse_args()
+    options = parser.parse_args()
 
     # Setting logging level
     if (options.debug):
