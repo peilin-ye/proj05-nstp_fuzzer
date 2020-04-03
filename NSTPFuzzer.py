@@ -162,6 +162,7 @@ def fuzz_auth_request(options):
         # Decrypt from NSPTMessage
         auth_request_response = decrypt_nstp(auth_request_response)
         # TODO check
+    logging.info("[AuthRequest] sent {0} AuthRequest.".format(options.rounds))
 
 def fuzz_ping_request(options):
     if options.data:
@@ -197,7 +198,11 @@ def fuzz_ping_request(options):
             decrypted_message.ping_request.CopyFrom(ping_request)
             ping_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-            # TODO decrypt and check PingResponse/Error
+            # Decrypt from NSPTMessage
+            ping_request_response = decrypt_nstp(ping_request_response)
+            # TODO check
+            
+    logging.info("[PingRequest] sent {0} PingRequest.".format(options.rounds))
 
 def fuzz_load_request(options):
     global server_address
@@ -226,10 +231,7 @@ def fuzz_load_request(options):
         auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
         decrypted_message = nstp_v3_pb2.DecryptedMessage()
         decrypted_message.auth_request.CopyFrom(auth_request)
-        auth_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
-
-        # TODO decrypt and check LoadResponse/Error
-        global client_rx
+        auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
         # parse load_public_key flag to boolean
         if options.load_public_key:
@@ -241,9 +243,13 @@ def fuzz_load_request(options):
             load_request = craft_load_request(options.load_key, public_key, options.fuzz_field_len)
             decrypted_message = nstp_v3_pb2.DecryptedMessage()
             decrypted_message.load_request.CopyFrom(load_request)
-            load_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
+            load_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-            # TODO decrypt and check LoadResponse/Error
+            # Decrypt from NSPTMessage
+            load_request_response = decrypt_nstp(load_request_response)
+            # TODO check
+            
+    logging.info("[LoadRequest] sent {0} LoadRequest.".format(options.rounds))
 
 def fuzz_store_request(options):
     global server_address
@@ -275,10 +281,7 @@ def fuzz_store_request(options):
         auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
         decrypted_message = nstp_v3_pb2.DecryptedMessage()
         decrypted_message.auth_request.CopyFrom(auth_request)
-        auth_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
-
-        # TODO decrypt and check LoadResponse/Error
-        global client_rx
+        auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
         # parse load_public_key flag to boolean
         if options.store_public_key:
@@ -290,9 +293,13 @@ def fuzz_store_request(options):
             store_request = craft_store_request(options.store_key, options.store_value, public_key, options.fuzz_field_len)
             decrypted_message = nstp_v3_pb2.DecryptedMessage()
             decrypted_message.store_request.CopyFrom(store_request)
-            store_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
+            store_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-            # TODO decrypt and check LoadResponse/Error
+            # Decrypt from NSPTMessage
+            store_request_response = decrypt_nstp(store_request_response)
+            # TODO check
+    
+    logging.info("[StoreRequest] sent {0} StoreRequest.".format(options.rounds))
     
 
 def generate_session_keys(sock, keys):
