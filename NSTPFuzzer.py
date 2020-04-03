@@ -85,6 +85,30 @@ def serialize_send_and_receive(msg, sock, msg_type=DECRYPTED_MESSAGE):
     # Here we shouldn't decrypt the message because we still don't know which type is it. We have to do it in each fuzz_...() function
     return receive_nstp(sock)
 
+def decrypt_nstp(nstp):
+    global client_rx
+    
+    ciphertext = nstp.encrypted_message.ciphertext
+    nonce = nstp.encrypted_message.nonce
+    
+    try:
+        plaintext = crypto_secretbox_open(ciphertext, nonce, client_rx)
+    except:
+        logging.error("decrypt_nstp(): decryption failed!")
+    
+    dec = nstp_v3_pb2.DecryptedMessage()
+    try:
+        dec.ParseFromString(plaintext)
+    except:
+        logging.error("decrypt_nstp(): ParseFromString() failed!")
+    
+    msg_type = dec.WhichOneof("message_")
+    logging.debug("decrypt_nstp(): successfully decrypted {0} message from server".format(msg_type))
+    if (options.debug):
+        print(dec)
+        
+    return dec
+
 def fuzz_client_hello(options):
     global client_public
     global server_address
@@ -135,8 +159,9 @@ def fuzz_auth_request(options):
             # Finally, serialize, encrypt the DecryptedMessage and wrap it into NSTPMessage
             auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-        # TODO decrypt and check AuthResponse/Error
-        global client_rx
+        # Decrypt from NSPTMessage
+        auth_request_response = decrypt_nstp(auth_request_response)
+        # TODO check
 
 def fuzz_ping_request(options):
     if options.data:
