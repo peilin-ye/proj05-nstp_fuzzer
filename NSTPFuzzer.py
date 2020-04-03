@@ -130,9 +130,10 @@ def fuzz_client_hello(options):
             sock.connect(server_address)
             
             client_hello = craft_client_hello(options.major, options.minor, options.user_agent, client_public, options.fuzz_field_len)
-            clien_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
+            client_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
 
         # TODO check ServerHello/Error
+        # client_hello_response can be 0, if server terminated connection
     logging.info("[ClientHello] sent {0} ClientHello.".format(options.rounds))
 
 def fuzz_auth_request(options):
@@ -160,7 +161,11 @@ def fuzz_auth_request(options):
             auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
         # Decrypt from NSPTMessage
-        auth_request_response = decrypt_nstp(auth_request_response)
+        if not auth_request_response:
+            logging.error("fuzz_auth_request(): failed to receive response from the server, maybe it terminated the connection?")
+            continue
+        else:
+            auth_request_response = decrypt_nstp(auth_request_response)
         # TODO check
     logging.info("[AuthRequest] sent {0} AuthRequest.".format(options.rounds))
 
@@ -199,7 +204,11 @@ def fuzz_ping_request(options):
             ping_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
             # Decrypt from NSPTMessage
-            ping_request_response = decrypt_nstp(ping_request_response)
+            if not ping_request_response:
+                logging.error("fuzz_ping_request(): failed to receive response from the server, maybe it terminated the connection?")
+                continue
+            else:
+                ping_request_response = decrypt_nstp(ping_request_response)
             # TODO check
             
     logging.info("[PingRequest] sent {0} PingRequest.".format(options.rounds))
@@ -246,7 +255,11 @@ def fuzz_load_request(options):
             load_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
             # Decrypt from NSPTMessage
-            load_request_response = decrypt_nstp(load_request_response)
+            if not load_request_response:
+                logging.error("fuzz_load_request(): failed to receive response from the server, maybe it terminated the connection?")
+                continue
+            else:
+                load_request_response = decrypt_nstp(load_request_response)
             # TODO check
             
     logging.info("[LoadRequest] sent {0} LoadRequest.".format(options.rounds))
@@ -296,11 +309,14 @@ def fuzz_store_request(options):
             store_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
             # Decrypt from NSPTMessage
-            store_request_response = decrypt_nstp(store_request_response)
+            if not store_request_response:
+                logging.error("fuzz_store_request(): failed to receive response from the server, maybe it terminated the connection?")
+                continue
+            else:
+                store_request_response = decrypt_nstp(store_request_response)
             # TODO check
     
     logging.info("[StoreRequest] sent {0} StoreRequest.".format(options.rounds))
-    
 
 def generate_session_keys(sock, keys):
     global client_public, client_private
