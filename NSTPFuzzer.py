@@ -2,7 +2,7 @@ import argparse, socket, struct, logging
 import utils.ProtoCrafter
 import nacl.utils
 import utils.nstp_v3_pb2 as nstp_v3_pb2
-from utils.ProtoCrafter import craft_client_hello, craft_auth_request, craft_load_request, craft_store_request # TODO Add missing imports here 
+from utils.ProtoCrafter import craft_client_hello, craft_auth_request, craft_ping_request, craft_load_request, craft_store_request # TODO Add missing imports here 
 import nacl.bindings.crypto_kx as crypto_kx
 from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretbox, crypto_secretbox_NONCEBYTES 
 from nacl.bindings.randombytes import randombytes
@@ -128,7 +128,7 @@ def fuzz_auth_request(options):
             sock.connect(server_address)
             # First, send a ClientHello to get the server public key
             generate_session_keys(sock, options.keys)
-            # Then, craft a AuthenticationRequest and wrap it into DecrypedMessage
+            # Then, craft a AuthenticationRequest and wrap it into DecryptedMessage
             auth_request = craft_auth_request(options.username, options.password, options.fuzz_field_len)
             decrypted_message = nstp_v3_pb2.DecryptedMessage()
             decrypted_message.auth_request.CopyFrom(auth_request)
@@ -140,14 +140,13 @@ def fuzz_auth_request(options):
 
 def fuzz_ping_request(options):
     if options.data:
-        logging.info("[PingRequest] username={options.data}")
+        logging.info("[PingRequest] username={0}".format(options.data))
 
     if options.algo:
-        logging.info("[PingRequest] algorithm={options.algo}")
+        logging.info("[PingRequest] algorithm={0}".format(options.algo))
 
     if options.keys is None:
-        logging.info("[PingRequest] You must provide a keys! Closing...")   
-        exit(1)
+        logging.info("[LoadRequest] client keys not provided, will be randomly generated!")
 
     if options.password is None:
         logging.info("[PingRequest] You must provide a password! Closing...")   
@@ -157,20 +156,23 @@ def fuzz_ping_request(options):
         logging.info("[PingRequest] You must provide a username! Closing...")   
         exit(1)
 
-    # First we have to generate the session keys and authenticate into the server
-    generate_session_keys(options.public_key)
-    auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
-    auth_request_response=serialize_send_and_receive(auth_request)
+    
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(server_address)
+        # First generate the session keys and authenticate into the server
+        generate_session_keys(sock, options.keys)
+        auth_request = craft_auth_request(options.username, options.password, options.fuzz_field_len)
+        decrypted_message = nstp_v3_pb2.DecryptedMessage()
+        decrypted_message.auth_request.CopyFrom(auth_request)
+        auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-    # TODO decrypt and check AuthResponse/Error
-    global client_rx
+        for i in range(0, options.rounds):
+            ping_request = craft_ping_request(options.data, options.algo, options.fuzz_field_len)
+            decrypted_message = nstp_v3_pb2.DecryptedMessage()
+            decrypted_message.ping_request.CopyFrom(ping_request)
+            ping_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-    for i in range(0, options.rounds):
-        ping_request=craft_ping_request(options.data, options.algo, options.fuzz_field_len)
-
-        ping_request_response=serialize_send_and_receive(ping_request)
-
-        # TODO decrypt and check PingResponse/Error
+            # TODO decrypt and check PingResponse/Error
 
 def fuzz_load_request(options):
     global server_address
