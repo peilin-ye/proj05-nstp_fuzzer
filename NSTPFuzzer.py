@@ -2,7 +2,7 @@ import argparse, socket, struct, logging
 import utils.ProtoCrafter
 import nacl.utils
 import utils.nstp_v3_pb2 as nstp_v3_pb2
-from utils.ProtoCrafter import craft_client_hello, craft_auth_request, craft_load_request, craft_store_request # TODO Add missing imports here 
+from utils.ProtoCrafter import craft_client_hello, craft_auth_request, craft_ping_request, craft_load_request, craft_store_request # TODO Add missing imports here 
 import nacl.bindings.crypto_kx as crypto_kx
 from nacl.bindings.crypto_secretbox import crypto_secretbox_open, crypto_secretbox, crypto_secretbox_NONCEBYTES 
 from nacl.bindings.randombytes import randombytes
@@ -85,6 +85,30 @@ def serialize_send_and_receive(msg, sock, msg_type=DECRYPTED_MESSAGE):
     # Here we shouldn't decrypt the message because we still don't know which type is it. We have to do it in each fuzz_...() function
     return receive_nstp(sock)
 
+def decrypt_nstp(nstp):
+    global client_rx
+    
+    ciphertext = nstp.encrypted_message.ciphertext
+    nonce = nstp.encrypted_message.nonce
+    
+    try:
+        plaintext = crypto_secretbox_open(ciphertext, nonce, client_rx)
+    except:
+        logging.error("decrypt_nstp(): decryption failed!")
+    
+    dec = nstp_v3_pb2.DecryptedMessage()
+    try:
+        dec.ParseFromString(plaintext)
+    except:
+        logging.error("decrypt_nstp(): ParseFromString() failed!")
+    
+    msg_type = dec.WhichOneof("message_")
+    logging.debug("decrypt_nstp(): successfully decrypted {0} message from server".format(msg_type))
+    if (options.debug):
+        print(dec)
+        
+    return dec
+
 def fuzz_client_hello(options):
     global client_public
     global server_address
@@ -106,9 +130,10 @@ def fuzz_client_hello(options):
             sock.connect(server_address)
             
             client_hello = craft_client_hello(options.major, options.minor, options.user_agent, client_public, options.fuzz_field_len)
-            clien_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
+            client_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
 
         # TODO check ServerHello/Error
+        # client_hello_response can be 0, if server terminated connection
     logging.info("[ClientHello] sent {0} ClientHello.".format(options.rounds))
 
 def fuzz_auth_request(options):
@@ -128,26 +153,31 @@ def fuzz_auth_request(options):
             sock.connect(server_address)
             # First, send a ClientHello to get the server public key
             generate_session_keys(sock, options.keys)
-            # Then, craft a AuthenticationRequest and wrap it into DecrypedMessage
+            # Then, craft a AuthenticationRequest and wrap it into DecryptedMessage
             auth_request = craft_auth_request(options.username, options.password, options.fuzz_field_len)
             decrypted_message = nstp_v3_pb2.DecryptedMessage()
             decrypted_message.auth_request.CopyFrom(auth_request)
             # Finally, serialize, encrypt the DecryptedMessage and wrap it into NSTPMessage
             auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-        # TODO decrypt and check AuthResponse/Error
-        global client_rx
+        # Decrypt from NSPTMessage
+        if not auth_request_response:
+            logging.error("fuzz_auth_request(): failed to receive response from the server, maybe it terminated the connection?")
+            continue
+        else:
+            auth_request_response = decrypt_nstp(auth_request_response)
+        # TODO check
+    logging.info("[AuthRequest] sent {0} AuthRequest.".format(options.rounds))
 
 def fuzz_ping_request(options):
     if options.data:
-        logging.info("[PingRequest] username={options.data}")
+        logging.info("[PingRequest] username={0}".format(options.data))
 
     if options.algo:
-        logging.info("[PingRequest] algorithm={options.algo}")
+        logging.info("[PingRequest] algorithm={0}".format(options.algo))
 
     if options.keys is None:
-        logging.info("[PingRequest] You must provide a keys! Closing...")   
-        exit(1)
+        logging.info("[LoadRequest] client keys not provided, will be randomly generated!")
 
     if options.password is None:
         logging.info("[PingRequest] You must provide a password! Closing...")   
@@ -157,20 +187,31 @@ def fuzz_ping_request(options):
         logging.info("[PingRequest] You must provide a username! Closing...")   
         exit(1)
 
-    # First we have to generate the session keys and authenticate into the server
-    generate_session_keys(options.public_key)
-    auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
-    auth_request_response=serialize_send_and_receive(auth_request)
+    
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(server_address)
+        # First generate the session keys and authenticate into the server
+        generate_session_keys(sock, options.keys)
+        auth_request = craft_auth_request(options.username, options.password, options.fuzz_field_len)
+        decrypted_message = nstp_v3_pb2.DecryptedMessage()
+        decrypted_message.auth_request.CopyFrom(auth_request)
+        auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-    # TODO decrypt and check AuthResponse/Error
-    global client_rx
+        for i in range(0, options.rounds):
+            ping_request = craft_ping_request(options.data, options.algo, options.fuzz_field_len)
+            decrypted_message = nstp_v3_pb2.DecryptedMessage()
+            decrypted_message.ping_request.CopyFrom(ping_request)
+            ping_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-    for i in range(0, options.rounds):
-        ping_request=craft_ping_request(options.data, options.algo, options.fuzz_field_len)
-
-        ping_request_response=serialize_send_and_receive(ping_request)
-
-        # TODO decrypt and check PingResponse/Error
+            # Decrypt from NSPTMessage
+            if not ping_request_response:
+                logging.error("fuzz_ping_request(): failed to receive response from the server, maybe it terminated the connection?")
+                continue
+            else:
+                ping_request_response = decrypt_nstp(ping_request_response)
+            # TODO check
+            
+    logging.info("[PingRequest] sent {0} PingRequest.".format(options.rounds))
 
 def fuzz_load_request(options):
     global server_address
@@ -199,10 +240,7 @@ def fuzz_load_request(options):
         auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
         decrypted_message = nstp_v3_pb2.DecryptedMessage()
         decrypted_message.auth_request.CopyFrom(auth_request)
-        auth_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
-
-        # TODO decrypt and check LoadResponse/Error
-        global client_rx
+        auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
         # parse load_public_key flag to boolean
         if options.load_public_key:
@@ -214,9 +252,17 @@ def fuzz_load_request(options):
             load_request = craft_load_request(options.load_key, public_key, options.fuzz_field_len)
             decrypted_message = nstp_v3_pb2.DecryptedMessage()
             decrypted_message.load_request.CopyFrom(load_request)
-            load_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
+            load_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-            # TODO decrypt and check LoadResponse/Error
+            # Decrypt from NSPTMessage
+            if not load_request_response:
+                logging.error("fuzz_load_request(): failed to receive response from the server, maybe it terminated the connection?")
+                continue
+            else:
+                load_request_response = decrypt_nstp(load_request_response)
+            # TODO check
+            
+    logging.info("[LoadRequest] sent {0} LoadRequest.".format(options.rounds))
 
 def fuzz_store_request(options):
     global server_address
@@ -248,10 +294,7 @@ def fuzz_store_request(options):
         auth_request=craft_auth_request(options.username, options.password, options.fuzz_field_len)
         decrypted_message = nstp_v3_pb2.DecryptedMessage()
         decrypted_message.auth_request.CopyFrom(auth_request)
-        auth_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
-
-        # TODO decrypt and check LoadResponse/Error
-        global client_rx
+        auth_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
         # parse load_public_key flag to boolean
         if options.store_public_key:
@@ -263,10 +306,17 @@ def fuzz_store_request(options):
             store_request = craft_store_request(options.store_key, options.store_value, public_key, options.fuzz_field_len)
             decrypted_message = nstp_v3_pb2.DecryptedMessage()
             decrypted_message.store_request.CopyFrom(store_request)
-            store_request_response=serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
+            store_request_response = serialize_send_and_receive(decrypted_message, sock, msg_type=DECRYPTED_MESSAGE)
 
-            # TODO decrypt and check LoadResponse/Error
+            # Decrypt from NSPTMessage
+            if not store_request_response:
+                logging.error("fuzz_store_request(): failed to receive response from the server, maybe it terminated the connection?")
+                continue
+            else:
+                store_request_response = decrypt_nstp(store_request_response)
+            # TODO check
     
+    logging.info("[StoreRequest] sent {0} StoreRequest.".format(options.rounds))
 
 def generate_session_keys(sock, keys):
     global client_public, client_private
