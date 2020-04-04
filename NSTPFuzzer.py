@@ -469,11 +469,19 @@ if __name__ == '__main__':
             logging.debug("client_public: {0}".format(client_public))
             logging.debug("client_private: {0}".format(client_private))
         except FileNotFoundError:
-            logging.error("\"./keys\" does not exist!")
-            exit(1)
-    else:
-        # randomly generate
-        pass
+            logging.debug("\"./keys\" does not exist!")
+            
+            try:
+                client_public, client_private = crypto_kx.crypto_kx_keypair()
+                f = open("./keys", "wb")
+                f.write(client_public)
+                f.write(client_private)
+                logging.debug("Generated client key pair and stored in file \"./keys\".")
+                logging.debug("client_public: {0}".format(client_public))
+                logging.debug("client_private: {0}".format(client_private))
+                f.close()
+            except Exception as e:
+                logging.error("Error generating and saving keypair: {e}")
        
 
     if options.client_hello:
