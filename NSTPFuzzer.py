@@ -482,8 +482,6 @@ if __name__ == '__main__':
                 f.close()
             except Exception as e:
                 logging.error("Error generating and saving keypair: {e}")
-    else:
-        pass
        
 
     if options.client_hello:
