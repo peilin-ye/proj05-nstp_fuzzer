@@ -433,7 +433,7 @@ if __name__ == '__main__':
 
     # Parse required arguments for AuthenticationRequest, PingRequest, StoreRequest and LoadRequest
     parser.add_argument("--keys", 
-                        help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Load key pairs from file "./keys".',
+                        help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Load key pairs from file "./keys". If file doesn\'t exist, then a keypair is generated and stored in "./keys".',
                         action = "store_true",
                         default=None) 
     parser.add_argument("--username", 
