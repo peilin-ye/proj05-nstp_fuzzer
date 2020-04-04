@@ -1,4 +1,4 @@
-import argparse, socket, struct, logging
+import argparse, socket, struct, logging, time, datetime
 import utils.ProtoCrafter
 import nacl.utils
 import utils.nstp_v3_pb2 as nstp_v3_pb2
@@ -16,28 +16,50 @@ def pack(x):
     return (len(x).to_bytes(2, byteorder="big") + x)
 
 def receive_nstp(sock):
-    # 1) Read the prefix
-    prefix = b""
-    while len(prefix) < 2:
-        chunk = sock.recv(2)
-        if not chunk:
-            break
-        prefix += chunk
-    if not prefix:
-        logging.error("receive_ntsp(): failed to read NSTPMessage length prefix!")
-        return 0
-    length = int.from_bytes(prefix, "big")
+
     
-    # 2) Read the payload
-    payload = b""
-    while len(payload) < length:
-        chunk = sock.recv(length)
-        if not chunk:
-            break
-        payload += chunk
-    if not payload:
-        logging.error("receive_ntsp(): failed to read NSTPMessage!")
+    try:
+        # sock.setblocking(0)
+        sock.settimeout(0.5)
+        expired= datetime.datetime.now() + datetime.timedelta(seconds=0.5)
+        while True:
+            header = sock.recv(2)
+            if header:
+                length, = struct.unpack('>H', header) 
+                payload= sock.recv(length)
+                break
+            if expired > datetime.datetime.now():
+                logging.debug("No response received")
+                return 0
+    except socket.timeout as e:
+        logging.debug("Timeout exceeded")
         return 0
+    except Exception as e:
+        logging.debug("Got error in socket while receiving: {0}".format(e))
+        return 0
+
+    # # 1) Read the prefix
+    # prefix = b""
+    # while len(prefix) < 2:
+    #     chunk = sock.recv(2)
+    #     if not chunk:
+    #         break
+    #     prefix += chunk
+    # if not prefix:
+    #     logging.error("receive_ntsp(): failed to read NSTPMessage length prefix!")
+    #     return 0
+    # length = int.from_bytes(prefix, "big")
+    
+    # # 2) Read the payload
+    # payload = b""
+    # while len(payload) < length:
+    #     chunk = sock.recv(length)
+    #     if not chunk:
+    #         break
+    #     payload += chunk
+    # if not payload:
+    #     logging.error("receive_ntsp(): failed to read NSTPMessage!")
+    #     return 0
     
     # 3) Parse it
     nstp = nstp_v3_pb2.NSTPMessage()
@@ -130,7 +152,8 @@ def fuzz_client_hello(options):
             sock.connect(server_address)
             
             client_hello = craft_client_hello(options.major, options.minor, options.user_agent, client_public, options.fuzz_field_len)
-            client_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)    
+            client_hello_response = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)   
+            time.sleep(options.wait) 
 
         # TODO check ServerHello/Error
         # client_hello_response can be 0, if server terminated connection
@@ -167,6 +190,8 @@ def fuzz_auth_request(options):
         else:
             auth_request_response = decrypt_nstp(auth_request_response)
         # TODO check
+        time.sleep(options.wait) 
+
     logging.info("[AuthRequest] sent {0} AuthRequest.".format(options.rounds))
 
 def fuzz_ping_request(options):
@@ -210,6 +235,7 @@ def fuzz_ping_request(options):
             else:
                 ping_request_response = decrypt_nstp(ping_request_response)
             # TODO check
+            time.sleep(options.wait) 
             
     logging.info("[PingRequest] sent {0} PingRequest.".format(options.rounds))
 
@@ -261,6 +287,7 @@ def fuzz_load_request(options):
             else:
                 load_request_response = decrypt_nstp(load_request_response)
             # TODO check
+            time.sleep(options.wait) 
             
     logging.info("[LoadRequest] sent {0} LoadRequest.".format(options.rounds))
 
@@ -315,6 +342,7 @@ def fuzz_store_request(options):
             else:
                 store_request_response = decrypt_nstp(store_request_response)
             # TODO check
+            time.sleep(options.wait) 
     
     logging.info("[StoreRequest] sent {0} StoreRequest.".format(options.rounds))
 
@@ -443,8 +471,13 @@ if __name__ == '__main__':
                         help='[AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] Valid password to log into the server.',
                         default=None)
     parser.add_argument("--fuzz_field_len", 
-                    help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] maximum length for variable length data, default is 512',
+                    help='[ClientHello/AuthenticationRequest/PingRequest/StoreRequest/LoadRequest] maximum length for variable length data, default is 1024',
                     default=1024)           
+    parser.add_argument("--wait",
+                        help='Time in seconds between messages. By default, this time is 0 second',
+                        type=float,
+                        default=0.0
+                        )    
 
     options = parser.parse_args()
 
