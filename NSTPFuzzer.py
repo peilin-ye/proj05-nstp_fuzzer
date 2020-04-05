@@ -57,9 +57,9 @@ def receive_nstp(sock):
     #     if not chunk:
     #         break
     #     payload += chunk
-    # if not payload:
-    #     logging.error("receive_ntsp(): failed to read NSTPMessage!")
-    #     return 0
+    if not payload:
+        logging.error("receive_ntsp(): failed to read NSTPMessage!")
+        return 0
     
     # 3) Parse it
     nstp = nstp_v3_pb2.NSTPMessage()
@@ -359,7 +359,12 @@ def generate_session_keys(sock, keys):
     
     client_hello = craft_client_hello(3, 0, 'user_agent', client_public, options.fuzz_field_len)
     nstp_message_server_hello = serialize_send_and_receive(client_hello, sock, msg_type=CLIENT_HELLO)
-    server_public = nstp_message_server_hello.server_hello.public_key
+    
+    if nstp_message_server_hello !=0:
+        server_public = nstp_message_server_hello.server_hello.public_key
+    else:
+        logging.error("Expecting ServerHello but nothing received. Server might have closed connection")
+        exit(1)
 
     # Generate the session keys
     client_rx, client_tx = crypto_kx.crypto_kx_client_session_keys(client_public, client_private, server_public)
