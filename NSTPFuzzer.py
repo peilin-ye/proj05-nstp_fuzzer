@@ -202,7 +202,7 @@ def fuzz_ping_request(options):
         logging.info("[PingRequest] algorithm={0}".format(options.algo))
 
     if options.keys is None:
-        logging.info("[LoadRequest] client keys not provided, will be randomly generated!")
+        logging.info("[PingRequest] client keys not provided, will be randomly generated!")
 
     if options.password is None:
         logging.info("[PingRequest] You must provide a password! Closing...")   
