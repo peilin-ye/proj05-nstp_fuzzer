@@ -196,7 +196,7 @@ def fuzz_auth_request(options):
 
 def fuzz_ping_request(options):
     if options.data:
-        logging.info("[PingRequest] username={0}".format(options.data))
+        logging.info("[PingRequest] data={0}".format(options.data))
 
     if options.algo:
         logging.info("[PingRequest] algorithm={0}".format(options.algo))
